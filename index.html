@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ROPA Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Dashboard -->
+  <div class="rp" id="app" hidden>
+    <header class="rp-head">
+      <div>
+        <div class="eyebrow">ROPA · Sales performance</div>
+        <h1 id="title">Sales overview</h1>
+        <p class="sub" id="takeaway"></p>
+      </div>
+      <div class="ctls">
+        <label class="ctl" for="month">Month<select id="month"></select></label>
+        <div class="row">
+          <span class="asof" id="asof"></span>
+          <button type="button" class="btn" id="btn-refresh">Refresh</button>
+        </div>
+      </div>
+    </header>
+    <p class="err" id="load-err" hidden></p>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="grid2">
+      <div class="card"><h3>Monthly sales, 2026 vs 2025</h3>
+        <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
+        <div class="chart" id="line"></div></div>
+      <div class="card"><h3>Units sold, 2026 vs 2025</h3>
+        <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
+        <div class="chart" id="bars"></div></div>
+    </section>
+
+    <section class="card"><h3>Top 5 sold units by product type, with recovery rate</h3>
+      <p class="note">Recovery rate is sold amount ÷ OPB. Green meets the target, amber is within 10 points, red is below that.</p>
+      <div class="tw"><table id="top5"><thead><tr><th>Product type</th><th>Units sold</th><th>Total amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="grid3">
+      <div class="card"><h3>Sold by division</h3><div class="donut" id="div"></div></div>
+      <div class="card"><h3>Sold by unit condition</h3><div class="donut" id="cond"></div></div>
+      <div class="card"><h3>Top sales associates</h3><p class="note">Units sold. PINNACLE is left out, as in the workbook.</p><div class="chart small" id="assoc"></div></div>
+    </section>
+
+    <section class="card"><h3 id="ns-title">Non-starter accounts per division</h3>
+      <div class="tw"><table id="ns"><thead><tr><th>Division</th><th>Units sold</th><th>Sold amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
+    </section>
+
+    <section class="card"><h3 id="inv-title">Total breakdown inventories</h3>
+      <p class="note">From the DAILY TOTAL INVTY sheet; it compares that sheet's two months and does not change with the month picker. For units on hand an increase is red. Redeemed and Sold are outflows, so an increase there is green, and they are left out of the grand total.</p>
+      <div class="tw"><table id="inv"><thead></thead><tbody></tbody></table></div>
+    </section>
+
+    <h2 id="loss-title">ROPA cause of losses</h2>
+    <p class="note lead" id="loss-line"></p>
+    <section class="grid2">
+      <div class="card"><h3>By unit condition</h3>
+        <div class="tw"><table id="lc"><thead><tr><th>Condition</th><th>Units sold</th><th>Net gain/(loss)</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+      <div class="card"><h3>Disposal costs</h3>
+        <div class="tw"><table id="costs"><thead><tr><th>Cost</th><th>Amount (PHP)</th><th>% of sold amount</th><th>Avg per unit sold</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+    </section>
+    <section class="card"><h3>By product type</h3>
+      <div class="tw"><table id="lp"><thead><tr><th>Product type</th><th>Units sold</th><th>Net gain/(loss)</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></section>
+    <section class="card"><h3>Top 10 loss units</h3><p class="note">Borrower names are left out of this version.</p>
+      <div class="tw"><table id="top10"><thead><tr><th>Unit</th><th>Product type</th><th>Condition</th><th>Net gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div></section>
+
+    <footer><span>ROPA | Sales performance dashboard · data from ROPA MONITORING.xlsx</span><span>More Sales. More Recovery. Greater Impact.</span></footer>
+  </div>
+
+  <div class="loading" id="loading">Loading…</div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
