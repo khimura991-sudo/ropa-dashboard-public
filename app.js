@@ -37,16 +37,39 @@
       const head = rows[0].map((h) => h.trim().toLowerCase());
       const pi = head.indexOf('part'), di = head.indexOf('data');
       if (pi < 0 || di < 0) throw new Error('The Google Sheet needs a "part" column and a "data" column in row 1.');
-      const json = rows.slice(1).filter((r) => r[pi] && r[di]).sort((x, y) => Number(x[pi]) - Number(y[pi])).map((r) => r[di]).join('');
-      if (!json) throw new Error('The Google Sheet has no data yet. Run the Power Automate flow once.');
-      try { d = JSON.parse(json); } catch (e) { throw new Error('The data in the Google Sheet is incomplete (the flow may still be writing). Try Refresh in a minute.'); }
+      const parts = rows.slice(1).filter((r) => r[pi] && r[di]).sort((x, y) => Number(x[pi]) - Number(y[pi])).map((r) => r[di]);
+      if (!parts.length) throw new Error('The Google Sheet has no data yet. Run the Power Automate flow once.');
+      // Join parts until the text is complete JSON; leftover rows from an older, longer export are ignored.
+      let acc = '';
+      for (const part of parts) { acc += part; try { d = JSON.parse(acc); break; } catch (e) { /* keep joining */ } }
+      if (!d) throw new Error('The data in the Google Sheet is incomplete (the flow may still be writing). Try Refresh in a minute.');
     } else {
       const r = await fetch((C.dataFile || 'data.json') + '?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error((C.dataFile || 'data.json') + ' is missing next to index.html.');
       d = await r.json();
     }
+    if (d.v === 2) expandCompact(d);
     d.sold.forEach((s) => { s.non_starter = !!s.non_starter; });
     return d;
+  }
+
+  // Compact export (v2): totals per month/product/division/condition/non-starter/loss group,
+  // associate counts per month, and the 10 biggest losses per month. Rebuilt here into per-unit rows
+  // that carry each group's average, so every total and count matches the full export.
+  function expandCompact(d) {
+    const F = ['opb', 'sold_amount', 'gain', 'storage_fee', 'notarial_fee', 'towing_fee', 'legal_fee', 'commissions', 'repair_fee'];
+    const sold = [];
+    d.g.forEach((x) => {
+      const n = x[6];
+      for (let k = 0; k < n; k++) {
+        const r = { month: MONTHS[x[0]], product_type: d.P[x[1]], division: d.D[x[2]], condition: d.C[x[3]], non_starter: !!x[4], associate: '' };
+        F.forEach((f, j) => { r[f] = x[7 + j] / n; });
+        sold.push(r);
+      }
+    });
+    d.sold = sold;
+    d.assoc = d.a.map((x) => ({ month: MONTHS[x[0]], name: d.A[x[1]], units: x[2] }));
+    d.top = d.t.map((x) => ({ month: MONTHS[x[0]], unit: x[1], product_type: d.P[x[2]], condition: d.C[x[3]], gain: x[4], recovery: x[5] }));
   }
 
   // ---------------------------------------------------------------- formatting
@@ -199,7 +222,8 @@
 
     drawDonut($('div'), groupSum(rs, 'division').sort((a, b) => b.u - a.u).map((r) => ({ name: r.name, units: r.u })));
     drawDonut($('cond'), groupSum(rs, 'condition').sort((a, b) => b.u - a.u).map((r) => ({ name: r.name, units: r.u })));
-    drawAssoc($('assoc'), groupSum(rs.filter((r) => r.associate && r.associate !== 'PINNACLE'), 'associate').map((r) => ({ name: r.name, units: r.u }))
+    drawAssoc($('assoc'), (D.assoc ? D.assoc.filter((r) => r.month === month && r.name !== 'PINNACLE').map((r) => ({ name: r.name, units: r.units }))
+      : groupSum(rs.filter((r) => r.associate && r.associate !== 'PINNACLE'), 'associate').map((r) => ({ name: r.name, units: r.u })))
       .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name)).slice(0, 5));
 
     $('ns-title').textContent = 'Non-starter accounts per division · ' + month;
@@ -218,7 +242,7 @@
     const fees = [['Storage fee', 'storage_fee'], ['Notarial fee', 'notarial_fee'], ['Towing fee', 'towing_fee'], ['Legal fee', 'legal_fee'], ['Commissions', 'commissions'], ['Repair fee', 'repair_fee']];
     const costRows = fees.map(([name, f]) => ({ name, a: d3.sum(rs, (r) => r[f]) })), ct = d3.sum(costRows, (r) => r.a);
     fill('costs', costRows, [[(r) => r.name], [(r) => pesoFull(r.a)], [(r) => pct(c.s ? r.a / c.s : 0)], [(r) => pesoFull(c.u ? r.a / c.u : 0)]], ['Total', pesoFull(ct), pct(c.s ? ct / c.s : 0), pesoFull(c.u ? ct / c.u : 0)]);
-    fill('top10', rs.slice().sort((a, b) => a.gain - b.gain).slice(0, 10), [[(r) => r.unit], [(r) => r.product_type], [(r) => r.condition], [(r) => pesoFull(r.gain), () => 'bad'], [(r) => pct(r.recovery), (r) => 'pill ' + recClass(r.recovery)]]);
+    fill('top10', (D.top ? D.top.filter((r) => r.month === month) : rs.slice()).sort((a, b) => a.gain - b.gain).slice(0, 10), [[(r) => r.unit], [(r) => r.product_type], [(r) => r.condition], [(r) => pesoFull(r.gain), () => 'bad'], [(r) => pct(r.recovery), (r) => 'pill ' + recClass(r.recovery)]]);
 
     // Inventory (fixed two-month comparison from DAILY TOTAL INVTY)
     $('inv-title').textContent = `Total breakdown inventories · ${inv.prev} vs ${inv.cur}`;
