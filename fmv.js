@@ -177,11 +177,12 @@
     lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
 
   loadFmv().then((f) => {
+    $('loading').hidden = true;
     model = FMV.prepare(f.units);
     const opt = FMV.options(model);
     setupForm(opt);
     const months = model.units.map((u) => u.month);
     $('asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
       (f.asOf && !isNaN(new Date(f.asOf)) ? ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-  }).catch((e) => { const el = $('load-err'); el.textContent = e.message; el.hidden = false; $('asof').textContent = ''; });
+  }).catch((e) => { $('loading').hidden = true; const el = $('load-err'); el.textContent = e.message; el.hidden = false; $('asof').textContent = ''; });
 })();

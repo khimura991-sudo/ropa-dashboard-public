@@ -82,7 +82,17 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .gate-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 32px; max-width: 440px; display: flex; flex-direction: column; gap: 14px; }
 .gate-card p { margin: 0; color: var(--muted); line-height: 1.5; }
 .gate-err { color: var(--bad) !important; font-size: 13px; }
-.loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); background: var(--bg); font-size: 14px; }
+/* Loading screen: pulsing logo with a navy-to-gold bar along the top */
+.loading { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; }
+.ld-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--grid); overflow: hidden; }
+.ld-bar i { position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, var(--navy), var(--gold)); animation: ld-slide 1.2s ease-in-out infinite; }
+.ld-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 16px; text-align: center; }
+.ld-mid svg { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 4px; animation: ld-pulse 1.6s ease-in-out infinite; }
+.ld-name { font-size: 15px; font-weight: 600; color: var(--fg); letter-spacing: .02em; }
+.ld-msg { font-size: 13px; color: var(--muted); }
+@keyframes ld-slide { 0% { left: -30%; } 100% { left: 100%; } }
+@keyframes ld-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(251, 203, 10, .45); } 50% { transform: scale(1.04); box-shadow: 0 0 0 14px rgba(251, 203, 10, 0); } }
+@media (prefers-reduced-motion: reduce) { .ld-bar i, .ld-mid svg { animation: none; } .ld-bar i { left: 0; width: 100%; opacity: .6; } }
 
 /* GDFI header band: navy with a gold rule, like the Excel dashboard */
 .rp-head { background: var(--band); color: var(--band-fg); border-radius: var(--r); padding: 22px 24px; border-bottom: 4px solid var(--gold); }
