@@ -50,7 +50,23 @@
     }
     if (d.v === 2) expandCompact(d);
     d.sold.forEach((s) => { s.non_starter = !!s.non_starter; });
+    buildInvHist(d);
     return d;
+  }
+
+  // Month-end inventory by status: month name -> [{ status, units, opb }].
+  // From the export's history (INVTY HISTORY sheet + DAILY TOTAL INVTY), or, for older exports, from DAILY TOTAL INVTY alone.
+  function buildInvHist(d) {
+    const H = {};
+    const name = (m) => MONTHS.find((x) => x.toLowerCase() === String(m || '').trim().toLowerCase());
+    if (d.ih && d.S) {
+      d.ih.forEach((x) => { const k = MONTHS[x[0]]; (H[k] = H[k] || []).push({ status: d.S[x[1]], units: x[2], opb: x[3] }); });
+    } else if (d.inventory) {
+      const inv = d.inventory, rows = inv.rows.filter((r) => r.status !== 'GRAND TOTAL');
+      if (name(inv.prev)) H[name(inv.prev)] = rows.map((r) => ({ status: r.status, units: r.units_prev, opb: r.opb_prev }));
+      if (name(inv.cur)) H[name(inv.cur)] = rows.map((r) => ({ status: r.status, units: r.units_cur, opb: r.opb_cur }));
+    }
+    d.invHist = H;
   }
 
   // Compact export (v2): totals per month/product/division/condition/non-starter/loss group,
@@ -196,11 +212,14 @@
     const tk = $('takeaway'); tk.replaceChildren();
     tk.append('Sold ', el('b', '', int(c.u)), ' units for ', el('b', '', peso(c.s)), ' at a recovery rate of ', el('b', '', pct(c.rec)), ` against the ${pct(T).replace('.0', '')} target. `, el('b', '', int(lossUnits)), ' of those units sold at a loss.');
 
-    const inv = D.inventory, gt = inv.rows.find((r) => r.status === 'GRAND TOTAL') || {};
-    const curIdx = MONTHS.findIndex((x) => x.toLowerCase() === String(inv.cur).toLowerCase());
-    const isCur = month.toLowerCase() === String(inv.cur).toLowerCase(), isPrev = month.toLowerCase() === String(inv.prev).toLowerCase();
-    const isLater = !isCur && !isPrev && curIdx >= 0 && i > curIdx;
-    const invUnits = isCur || isLater ? gt.units_cur : isPrev ? gt.units_prev : null;
+    // Inventory snapshot for the picked month (or the latest one, for months after it), and the month before
+    const outflow = (st) => /^(REDEEMED|SOLD)$/.test(st);
+    const H = D.invHist || {}, snapMonths = MONTHS.filter((m) => H[m]), latest = snapMonths[snapMonths.length - 1];
+    const invTot = (rows) => rows.filter((r) => !outflow(r.status)).reduce((t, r) => ({ u: t.u + (r.units || 0), o: t.o + (r.opb || 0) }), { u: 0, o: 0 });
+    const invMonth = H[month] ? month : latest && i > MONTHS.indexOf(latest) ? latest : null;
+    const isLater = !!invMonth && invMonth !== month;
+    const invPrevMonth = invMonth && MONTHS.indexOf(invMonth) > 0 ? MONTHS[MONTHS.indexOf(invMonth) - 1] : null;
+    const invCur = invMonth ? invTot(H[invMonth]) : null, invPrev = invPrevMonth && H[invPrevMonth] ? invTot(H[invPrevMonth]) : null;
     const ptsSpan = (() => { const s = el('span'); const d = c.rec != null && p && p.rec != null ? (c.rec - p.rec) * 100 : null;
       if (d == null) { s.textContent = '— pts ' + lm; return s; } s.className = Math.abs(d) < 1e-9 ? 'flat' : d > 0 ? 'good' : 'bad'; s.textContent = (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '● ') + Math.abs(d).toFixed(1) + ' pts ' + lm; return s; })();
     $('kpis').replaceChildren(
@@ -208,9 +227,9 @@
       kpiCard('Total units sold', int(c.u), [delta(chg(c.u, p && p.u), true, lm), delta(chg(c.u, ly && ly.u), true, 'vs same month 2025')]),
       kpiCard('Recovery rate', pct(c.rec), [delta(c.rec == null ? null : (c.rec - T) / T, true, `vs ${pct(T).replace('.0', '')} target`), ptsSpan]),
       kpiCard('Total gain / (loss)', peso(c.g), [delta(lchg(c.g, p && p.g), false, 'loss ' + lm), delta(lchg(c.g, ly && ly.g), false, 'loss vs same month 2025')]),
-      kpiCard(isLater ? `Total inventory (${inv.cur})` : 'Total inventory', invUnits == null ? '—' : int(invUnits), invUnits == null ? [el('span', '', 'No inventory snapshot for this month')] :
-        [...(isLater ? [el('span', 'flat', `Latest snapshot: ${inv.cur}. ${month} not in the inventory sheet yet`)] : []),
-         ...(isCur || isLater ? [delta(chg(gt.units_cur, gt.units_prev), false, 'vs ' + inv.prev)] : []), delta((invUnits - IT) / IT, false, `vs ${IT} target`)]),
+      kpiCard(isLater ? `Total inventory (${invMonth})` : 'Total inventory', invCur ? int(invCur.u) : '—', !invCur ? [el('span', '', 'No inventory snapshot for this month')] :
+        [...(isLater ? [el('span', 'flat', `Latest snapshot: ${invMonth}. ${month} not in the inventory sheets yet`)] : []),
+         ...(invPrev ? [delta(chg(invCur.u, invPrev.u), false, 'vs ' + invPrevMonth)] : []), delta((invCur.u - IT) / IT, false, `vs ${IT} target`)]),
     );
 
     drawMonthly($('line'), D.monthly, 'sales', 'line', i);
@@ -244,14 +263,23 @@
     fill('costs', costRows, [[(r) => r.name], [(r) => pesoFull(r.a)], [(r) => pct(c.s ? r.a / c.s : 0)], [(r) => pesoFull(c.u ? r.a / c.u : 0)]], ['Total', pesoFull(ct), pct(c.s ? ct / c.s : 0), pesoFull(c.u ? ct / c.u : 0)]);
     fill('top10', (D.top ? D.top.filter((r) => r.month === month) : rs.slice()).sort((a, b) => a.gain - b.gain).slice(0, 10), [[(r) => r.unit], [(r) => r.product_type], [(r) => r.condition], [(r) => pesoFull(r.gain), () => 'bad'], [(r) => pct(r.recovery), (r) => 'pill ' + recClass(r.recovery)]]);
 
-    // Inventory (fixed two-month comparison from DAILY TOTAL INVTY)
-    $('inv-title').textContent = `Total breakdown inventories · ${inv.prev} vs ${inv.cur}`;
-    const ih = el('tr'); ['Status', `Units (${inv.cur})`, `Units vs ${inv.prev}`, `OPB (${inv.cur})`, `OPB vs ${inv.prev}`].forEach((h) => ih.appendChild(el('th', '', h)));
+    // Inventory breakdown: picked month vs the month before
+    const pmName = invPrevMonth || 'previous month';
+    $('inv-title').textContent = 'Total breakdown inventories · ' + (!invMonth ? month + ' (no snapshot)' : invPrev ? `${invPrevMonth} vs ${invMonth}` : invMonth);
+    const ih = el('tr'); ['Status', `Units (${invMonth || month})`, `Units vs ${pmName}`, `OPB (${invMonth || month})`, `OPB vs ${pmName}`].forEach((h) => ih.appendChild(el('th', '', h)));
     document.querySelector('#inv thead').replaceChildren(ih);
-    const outflow = (s) => /^(REDEEMED|SOLD)$/.test(s);
-    const vs = (a, b, f) => { const d = chg(a, b); return (d == null ? '–' : Math.abs(d) < 1e-9 ? '● 0.0%' : (d > 0 ? '▲ ' : '▼ ') + d3.format('.1%')(Math.abs(d))) + '  vs ' + f(b); };
+    const vs = (a, b, f) => { if (b == null) return '–'; const d = chg(a, b); return (d == null ? '–' : Math.abs(d) < 1e-9 ? '● 0.0%' : (d > 0 ? '▲ ' : '▼ ') + d3.format('.1%')(Math.abs(d))) + '  vs ' + f(b); };
     const vcls = (r, a, b) => { const d = chg(a, b); if (d == null || Math.abs(d) < 1e-9) return 'flat'; return (d > 0) === outflow(r.status) ? 'good' : 'bad'; };
-    fill('inv', inv.rows.map((r) => ({ ...r, _tot: r.status === 'GRAND TOTAL' })), [
+    let invRows = [];
+    if (invMonth) {
+      const prevRows = invPrev ? H[invPrevMonth] : [];
+      const pr = (st) => prevRows.find((r) => r.status === st) || {};
+      const all = H[invMonth].filter((r) => !(r.status === 'UNCLASSIFIED' && !r.units && !(pr(r.status).units)))
+        .map((r) => ({ status: r.status, units_cur: r.units, opb_cur: r.opb, units_prev: invPrev ? pr(r.status).units ?? null : null, opb_prev: invPrev ? pr(r.status).opb ?? null : null }));
+      invRows = [...all.filter((r) => !outflow(r.status)), ...all.filter((r) => outflow(r.status)),
+        { status: 'GRAND TOTAL', units_cur: invCur.u, opb_cur: invCur.o, units_prev: invPrev ? invPrev.u : null, opb_prev: invPrev ? invPrev.o : null, _tot: true }];
+    }
+    fill('inv', invRows, [
       [(r) => r.status], [(r) => int(r.units_cur)],
       [(r) => vs(r.units_cur, r.units_prev, int), (r) => vcls(r, r.units_cur, r.units_prev)],
       [(r) => pesoFull(r.opb_cur)],
