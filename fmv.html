@@ -76,14 +76,19 @@
       </section>
     </section>
 
-    <section class="card">
-      <h3>How the estimate works</h3>
-      <ol class="how">
-        <li>It finds sold units like this one: the same brand and model first, then the same brand and body type, then the same body type. Closer variants, years, body type, transmission, condition and more recent sales count more.</li>
-        <li>It adjusts each of those sold prices to this unit, using what our own sales show about price differences: <span id="how-coef">year model, mileage, condition and transmission</span>.</li>
-        <li>The fair market value is the middle of those adjusted prices; the likely range covers most of them.</li>
-      </ol>
-      <p class="note" id="how-acc"></p>
+    <section class="card" id="comps">
+      <div class="comps-head">
+        <h3>Comparable sold units</h3>
+        <button type="button" class="btn ghost" id="btn-more" hidden>Show 5 more</button>
+      </div>
+      <p class="note" id="comps-note">Get a fair market value to see the closest sold units it was based on.</p>
+      <div class="tw" id="comps-wrap" hidden>
+        <table id="comps-table">
+          <thead><tr><th>#</th><th>Unit</th><th>Year</th><th>Body</th><th>Transmission</th><th>Mileage</th><th>Condition</th><th>Sold</th><th class="num">Sold amount</th><th class="num">Adjusted to this unit</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note" id="comps-foot" hidden>Closest matches first: same brand and model, then nearer year, body type, transmission, condition and more recent sales. "Adjusted to this unit" is the sold amount corrected for differences in year model, mileage, condition and transmission; the fair market value is the middle of these adjusted amounts.</p>
     </section>
   </div>
 

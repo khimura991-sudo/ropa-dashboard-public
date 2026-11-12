@@ -129,3 +129,12 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .how { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.55; display: flex; flex-direction: column; gap: 4px; max-width: 80ch; }
 .fld .fl { display: flex; align-items: baseline; gap: 6px; }
 @media (prefers-color-scheme: dark) { .btn.primary { background: var(--gold); border-color: var(--gold); color: var(--navy-deep); } }
+/* FMV comparable sold units */
+.comps-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#comps-table th, #comps-table td { text-align: left; vertical-align: top; }
+#comps-table th:first-child, #comps-table td:first-child { min-width: 0; width: 1%; color: var(--muted); }
+#comps-table td:nth-child(2) { white-space: normal; min-width: 12rem; }
+#comps-table .num { text-align: right; }
+#comps-table .strong { font-weight: 600; }
+#comps-table .cu { font-weight: 500; }
+#comps-table .ct { font-size: 11px; color: var(--muted); margin-top: 1px; }

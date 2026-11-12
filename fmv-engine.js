@@ -231,6 +231,10 @@
       fmv: r5(fmv), low: r5(low), high: r5(high), confidence, comps: comps.length, sameModel, effN, level,
       fromMonth: Math.min.apply(null, months), toMonth: Math.max.apply(null, months), model, bodyN: body, transN: trans, condN: cond,
       rawFmv: fmv,
+      // Closest sold units (most similar first): what the estimate leaned on most
+      top: comps.slice().sort((a, b) => b.w - a.w).slice(0, 10).map((x) => ({
+        brand: x.u.brandN, model: x.u.model, series: x.u.seriesN, year: x.u.year, body: x.u.bodyN, trans: x.u.transN, cond: x.u.condN,
+        km: x.u.km, month: x.u.month, price: x.u.price, adjusted: x.v, match: x.tier })),
     };
   }
 

@@ -131,6 +131,35 @@
     $('r-adj').replaceChildren(...li.map((t) => { const x = document.createElement('li'); x.textContent = t; return x; }));
   }
 
+  // Comparable sold units table: 5 closest, "Show 5 more" for up to 10
+  let shown = 5, lastTop = [];
+  const matchLabel = (t) => (t === 'same brand and model' ? 'Same model' : t === 'same brand and body type' ? 'Same brand & body' : 'Same body type');
+  function renderComps() {
+    const tb = document.querySelector('#comps-table tbody');
+    const td = (txt, cls) => { const c = document.createElement('td'); c.textContent = txt; if (cls) c.className = cls; return c; };
+    tb.replaceChildren(...lastTop.slice(0, shown).map((u, i) => {
+      const tr = document.createElement('tr');
+      const unit = document.createElement('td');
+      const nm = document.createElement('div'); nm.className = 'cu'; nm.textContent = title(u.brand) + ' ' + (u.series || title(u.model) || '');
+      const tag = document.createElement('div'); tag.className = 'ct'; tag.textContent = matchLabel(u.match);
+      unit.append(nm, tag);
+      tr.append(td(String(i + 1), 'muted'), unit, td(String(u.year)), td(u.body === 'Not specified' ? '—' : u.body), td(u.trans === 'Not specified' ? '—' : u.trans),
+        td(u.km ? u.km.toLocaleString('en-PH') + ' km' : '—'), td(u.cond === 'Not specified' ? '—' : u.cond.replace(' issues', '')),
+        td(monthName(u.month)), td(peso(u.price), 'num'), td(peso(Math.round(u.adjusted / 1000) * 1000), 'num strong'));
+      return tr;
+    }));
+    const more = $('btn-more');
+    more.hidden = lastTop.length <= 5;
+    more.textContent = shown > 5 ? 'Show fewer' : `Show ${Math.min(5, lastTop.length - 5)} more`;
+  }
+  $('btn-more').addEventListener('click', () => { shown = shown > 5 ? 5 : 10; renderComps(); });
+  function showComps(e) {
+    lastTop = e.top || []; shown = 5;
+    $('comps-wrap').hidden = !lastTop.length; $('comps-foot').hidden = !lastTop.length;
+    $('comps-note').textContent = lastTop.length ? `The ${Math.min(5, lastTop.length)} closest of the ${e.comps} sold units this estimate used.` : 'No comparable sold units found.';
+    renderComps();
+  }
+
   $('fmv-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const q = { brand: $('f-brand').value, series: $('f-series').value.trim(), year: $('f-year').value, product: $('f-product').value,
@@ -141,9 +170,11 @@
     const e = FMV.estimate(model, q);
     if (!e) { err.textContent = 'There are no similar sold units to compare with yet. Try adding the body type.'; err.hidden = false; return; }
     show(e, q);
+    showComps(e);
     if (window.matchMedia('(max-width: 860px)').matches) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true; });
+  $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
+    lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
 
   loadFmv().then((f) => {
     model = FMV.prepare(f.units);
@@ -152,8 +183,5 @@
     const months = model.units.map((u) => u.month);
     $('asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
       (f.asOf && !isNaN(new Date(f.asOf)) ? ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-    const c = model.coef;
-    $('how-coef').textContent = `about ${pctTxt(Math.exp(c.year) - 1).replace('+', '')} per newer year model, ${pctTxt(Math.exp(c.moderate) - 1)} for moderate issues, ${pctTxt(Math.exp(c.major) - 1)} for major issues, and a small mileage effect`;
-    $('how-acc').textContent = 'Tested on our own past sales: for models we have sold several times, the estimate is typically within about 11% of the actual sold amount, and the likely range contains the actual price about 7 times out of 10.';
   }).catch((e) => { const el = $('load-err'); el.textContent = e.message; el.hidden = false; $('asof').textContent = ''; });
 })();
