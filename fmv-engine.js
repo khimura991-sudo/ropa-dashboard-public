@@ -32,42 +32,85 @@
   }
 
   // ---------------------------------------------------------------- clean-up of free-text fields
+  // The same rules clean the sales file and what people type in the form, so both always match.
   const up = (s) => String(s == null ? '' : s).toUpperCase().replace(/\s+/g, ' ').trim();
+  const NONE = /^(N\/?A|NONE|NULL|-+|0|UNKNOWN|NOT SPECIFIED)$/;
+
+  const BRAND_FIX = { 'MITSUBIHSI': 'MITSUBISHI', 'MITSUBISHI-FUSO': 'FUSO', 'MITSUBISHI FUSO': 'FUSO', 'KIA MOTORS': 'KIA', 'SINOTRUCK': 'SINOTRUK',
+    'REBUILT ISUZU': 'ISUZU', 'MERCEDES': 'MERCEDES-BENZ', 'MERCEDES BENZ': 'MERCEDES-BENZ', 'VW': 'VOLKSWAGEN' };
+  function cleanBrand(s) { s = up(s); return BRAND_FIX[s] || s; }
+
+  // Series: tidy spacing and hyphens, drop notes that are not part of the model name (NEW, DET., W/ ..., the brand repeated)
+  function cleanSeries(s, brand) {
+    s = up(s).replace(/\s*-\s*/g, '-').replace(/[^A-Z0-9./\- ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (NONE.test(s) || /^W\//.test(s)) return '';
+    let t = s.split(' ');
+    while (t.length && /^(NEW|ALL-NEW|ALL|DET\.?|DETACHABLE|THE)$/.test(t[0])) t.shift();
+    const b = cleanBrand(brand);
+    if (t.length > 1 && t[0] === b) { if (/^\d$/.test(t[1])) { t = [t[0] + t[1]].concat(t.slice(2)); } else t.shift(); }
+    return t.join(' ');
+  }
+
+  const MODEL_FIX = { MONTEROSPORT: 'MONTERO SPORT', MONTERO: 'MONTERO SPORT', XPANPER: 'XPANDER', ADVENTURES: 'ADVENTURE', NAVARRA: 'NAVARA',
+    TRAVIS: 'TRAVIZ', STAFE: 'STAREX', SUPERGREAT: 'SUPER GREAT', NV350: 'NV350 URVAN', DMAX: 'D-MAX', MUX: 'MU-X', CRV: 'CR-V', BRV: 'BR-V',
+    HRV: 'HR-V', XTRAIL: 'X-TRAIL', H100: 'H-100', BT50: 'BT-50', ECOSPORTS: 'ECOSPORT', VIOZ: 'VIOS', INOVA: 'INNOVA', FORTUNNER: 'FORTUNER' };
+  const NO_MODEL = /^(TRUCK|ALUMINUM|BUS|REBUILT|REF|CANOPY|ROOFRACK|ROOF|PIPE|CARGO|DUMP|WING|VAN|CLOSED|GRILLS?|RAILINGS?|POWER|LIFTER|BODY|STEEL|SIDING|EXT)$/;
+  // Base model from a series: MIRAGE G4 GLX 1.2 CVT -> MIRAGE G4, D-MAX 3.0 4X4 -> D-MAX, GRAND STAREX GL -> GRAND STAREX
+  function modelOf(series, brand) {
+    const t = cleanSeries(series, brand).split(' ').filter(Boolean);
+    if (!t.length || NO_MODEL.test(t[0])) return '';
+    const a = t[0], n = t[1] || '';
+    if (/^\d+$/.test(a) && /^WH/.test(n)) return a + ' WHEELER';
+    if (a === 'ECO' && n === 'SPORT') return 'ECOSPORT';
+    if (a === 'SUPER' && n === 'GREAT') return 'SUPER GREAT';
+    if (a === 'GRAND' && n) return 'GRAND ' + (MODEL_FIX[n] || n);
+    if (a === 'COROLLA' && n === 'CROSS') return 'COROLLA CROSS';
+    if (a === 'NV350' || (a === 'NISSAN' && n === 'URVAN')) return 'NV350 URVAN';
+    if (MODEL_FIX[a.replace(/-/g, '')]) return MODEL_FIX[a.replace(/-/g, '')];
+    if (MODEL_FIX[a]) return MODEL_FIX[a];
+    if (/^[A-Z]\d$/.test(n)) return a + ' ' + n;
+    return a;
+  }
+  const tokens = (s) => up(s).replace(/[^A-Z0-9./\- ]/g, ' ').split(' ').filter(Boolean);
+
   function normTrans(s) {
     s = up(s);
     const gear = /AUTO|MATIC|A\/T|\bAT\b|CVT|DCT/.test(s) ? 'Automatic' : /MANUAL|M\/T|\bMT\b/.test(s) ? 'Manual' : '';
-    const fuel = /DIESEL|\bD\b/.test(s) ? 'Diesel' : /GAS|PETROL|\bG\b/.test(s) ? 'Gas' : '';
-    return [gear, fuel].filter(Boolean).join(' / ') || 'Other';
+    const fuel = /DIESEL|\bCRDI\b/.test(s) ? 'Diesel' : /GAS|PETROL|GASOLINE/.test(s) ? 'Gas' : '';
+    return [gear, fuel].filter(Boolean).join(' / ') || 'Not specified';
   }
   function normBody(s) {
     s = up(s);
-    if (/MULTI ?CAB|MINI ?(TRUCK|VAN)|SCRUM|CARRY/.test(s)) return 'Multicab';
+    if (/MULTI ?CAB|SCRUM|\bCARRY\b/.test(s)) return 'Multicab';
+    if (/MOTOR|TRICYCLE|TRIKE/.test(s)) return 'Motorcycle / tricycle';
     if (/HATCH/.test(s)) return 'Hatchback';
     if (/SEDAN/.test(s)) return 'Sedan';
-    if (/PICK ?-?UP/.test(s)) return 'Pick-up';
-    if (/SUV/.test(s)) return 'SUV';
-    if (/WAGON|AUV|MPV/.test(s)) return 'Wagon / MPV';
     if (/DROP ?SIDE/.test(s)) return 'Dropside';
-    if (/TRUCK|C\/C|CAB ?& ?CHASSIS|CHASSIS|ALUMINUM|WING|REEFER|CLOSED|TRACTOR|DUMP|TANKER/.test(s)) return 'Truck';
-    if (/VAN|URVAN|HIACE|COMMUTER/.test(s)) return 'Van';
-    if (/MOTOR|TRICYCLE|TRIKE/.test(s)) return 'Motorcycle / tricycle';
-    return s ? s.charAt(0) + s.slice(1).toLowerCase() : 'Other';
+    if (/DUMP|WING|CLOSED VAN|FREEZER|REEFER|REFRIGERAT|ALUMINUM|BOOM|TRACTOR|TANKER|CHASSIS|C\/C|TRUCK|WHEELER/.test(s)) return 'Truck';
+    if (/PICK|DOUBLE ?CAB|SINGLE ?CAB/.test(s)) return 'Pick-up';
+    if (/SUV|SPORTS? UTILITY|\bCUV\b|CROSSOVER/.test(s)) return 'SUV';
+    if (/WAGON|MPV|AUV/.test(s)) return 'Wagon / MPV';
+    if (/VAN|SHUTTLE|COMMUTER|\bFB\b|JITNEY|\bBUS\b/.test(s)) return 'Van';
+    return 'Not specified'; // e.g. blank, N/A, UTILITY VEHICLE, SUB COMPACT: filled from the model's usual body type
   }
   function normCond(s) {
     s = up(s);
-    if (/MAJOR|ENGINE|NOT RUNNING|NON.?START/.test(s)) return 'Major issues';
+    if (/MAJOR|ENGINE|NOT RUNNING|TOWED|NON.?START|FLOOD|WRECK/.test(s)) return 'Major issues';
     if (/MODERATE|MECHANICAL/.test(s)) return 'Moderate issues';
     if (/MINOR|BODY|GOOD|RUNNING/.test(s)) return 'Minor issues';
     return 'Not specified';
   }
-  const tokens = (s) => up(s).replace(/[^A-Z0-9./ ]/g, ' ').split(' ').filter(Boolean);
-  function modelOf(series) {
-    const t = tokens(series);
-    if (!t.length) return '';
-    let m = t[0];
-    const nx = t[1] || '';
-    if (/^[A-Z]\d$/.test(nx) || /^(SPT|SPORT|SPORTS|URVAN|CROSS|PLUS|GRANDIA|COMMUTER)$/.test(nx)) m += ' ' + (nx === 'SPT' || nx === 'SPORTS' ? 'SPORT' : nx);
-    return m;
+  // Mileage in km, or null when unreadable (N/A, NOT WORKING, NO DISPLAY, under 1,000 or over 999,999 km)
+  function normKm(v) {
+    if (typeof v === 'number') return v >= 1000 && v <= 999999 ? Math.round(v) : null;
+    const s = up(v);
+    if (!s || /NOT WORK|NO DISPLAY|DEFECT|BROKEN|N\/A|NONE|UNKNOWN/.test(s)) return null;
+    const m = s.match(/\d[\d,.]*/);
+    if (!m) return null;
+    let x = m[0];
+    x = /^\d{1,3}(\.\d{3})+$/.test(x) ? x.replace(/\./g, '') : x.replace(/,/g, '');
+    const n = Number(x);
+    return n >= 1000 && n <= 999999 ? Math.round(n) : null;
   }
   const jaccard = (a, b) => { const A = new Set(a), Bs = new Set(b); let i = 0; A.forEach((x) => { if (Bs.has(x)) i++; }); const u = A.size + Bs.size - i; return u ? i / u : 0; };
 
@@ -89,7 +132,7 @@
     const medKm = kmKnown.length ? kmKnown.map((u) => u.km).sort((a, b) => a - b)[kmKnown.length >> 1] : 80000;
     const feat = (u) => [u.year, Math.log(u.km > 0 ? u.km : medKm), u.condN === 'Moderate issues' ? 1 : 0, u.condN === 'Major issues' ? 1 : 0, /Automatic/.test(u.transN) ? 1 : 0];
     const groups = {};
-    rows.forEach((u) => { (groups[u.key] = groups[u.key] || []).push(u); });
+    rows.forEach((u) => { if (u.key) (groups[u.key] = groups[u.key] || []).push(u); });
     const X = [], y = [];
     Object.values(groups).forEach((g) => {
       if (g.length < 2) return;
@@ -110,11 +153,16 @@
 
   function prepare(raw) {
     const units = raw.filter((u) => u.price > 0).map((u) => {
-      const brand = up(u.brand), series = up(u.series);
-      return Object.assign({}, u, { brandN: brand, seriesN: series, model: modelOf(series), key: brand + '|' + modelOf(series), tok: tokens(series),
-        bodyN: normBody(u.body), transN: normTrans(u.trans), condN: normCond(u.cond), productN: up(u.product) });
+      const brand = cleanBrand(u.brand), series = cleanSeries(u.series, u.brand), model = modelOf(u.series, u.brand);
+      return Object.assign({}, u, { brandN: brand, seriesN: series, model, key: model ? brand + '|' + model : '', tok: tokens(series),
+        bodyN: normBody(u.body), transN: normTrans(u.trans), condN: normCond(u.cond), productN: up(u.product),
+        km: typeof u.km === 'number' ? normKm(u.km) : normKm(u.km) });
     });
-    const lastMonth = units.reduce((m, u) => Math.max(m, u.month || 0), 0);
+    // Fill a missing or vague body type with the body type most often recorded for that model
+    const mode = {};
+    units.forEach((u) => { if (u.key && u.bodyN !== 'Not specified') { const m = (mode[u.key] = mode[u.key] || {}); m[u.bodyN] = (m[u.bodyN] || 0) + 1; } });
+    units.forEach((u) => { if (u.bodyN === 'Not specified' && mode[u.key]) { const m = mode[u.key]; u.bodyN = Object.keys(m).sort((a, b) => m[b] - m[a])[0]; } });
+    const lastMonth = units.reduce((m, x) => Math.max(m, x.month || 0), 0);
     return { units, coef: learn(units), lastMonth };
   }
 
@@ -131,9 +179,9 @@
   function estimate(m, q, opts) {
     opts = opts || {};
     const c = m.coef;
-    const brand = up(q.brand), series = up(q.series), model = modelOf(series), key = brand + '|' + model, tok = tokens(series);
-    const body = q.body ? normBody(q.body) : '', trans = q.trans ? normTrans(q.trans) : '', cond = q.cond ? normCond(q.cond) : '';
-    const product = up(q.product), year = Number(q.year), km = Number(q.km) > 0 ? Number(q.km) : null;
+    const brand = cleanBrand(q.brand), series = cleanSeries(q.series, q.brand), model = modelOf(q.series, q.brand), key = model ? brand + '|' + model : '\u0000', tok = tokens(series);
+    const body = q.body && normBody(q.body) !== 'Not specified' ? normBody(q.body) : '', trans = q.trans && normTrans(q.trans) !== 'Not specified' ? normTrans(q.trans) : '', cond = q.cond ? normCond(q.cond) : '';
+    const product = up(q.product), year = Number(q.year), km = normKm(Number(q.km));
     const pool = m.units.filter((u) => u !== opts.exclude);
 
     const tiers = [
@@ -189,12 +237,13 @@
   // Lists for the form: brands, models by brand, years, etc.
   function options(m) {
     const count = (f) => { const c = {}; m.units.forEach((u) => { const k = f(u); if (k) c[k] = (c[k] || 0) + 1; }); return Object.keys(c).sort((a, b) => c[b] - c[a]); };
+    // Suggestions per brand: the clean model names, most sold first
     const seriesBy = {};
-    m.units.forEach((u) => { (seriesBy[u.brandN] = seriesBy[u.brandN] || {})[u.seriesN] = 1; });
-    Object.keys(seriesBy).forEach((b) => { seriesBy[b] = Object.keys(seriesBy[b]).sort(); });
+    m.units.forEach((u) => { if (!u.model) return; const c = (seriesBy[u.brandN] = seriesBy[u.brandN] || {}); c[u.model] = (c[u.model] || 0) + 1; });
+    Object.keys(seriesBy).forEach((b) => { const c = seriesBy[b]; seriesBy[b] = Object.keys(c).sort((x, y) => c[y] - c[x]); });
     return { brands: count((u) => u.brandN).sort(), products: count((u) => u.productN), bodies: count((u) => u.bodyN), trans: count((u) => u.transN), seriesBy };
   }
 
-  const api = { unpack, prepare, estimate, options, normBody, normTrans, normCond, modelOf, B62 };
+  const api = { unpack, prepare, estimate, options, normBody, normTrans, normCond, normKm, modelOf, cleanBrand, cleanSeries, B62 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FMV = api;
 })(typeof window !== 'undefined' ? window : this);

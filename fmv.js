@@ -88,7 +88,7 @@
     const first = keepFirst ? sel.options[0] : null;
     sel.replaceChildren(...(first ? [first] : []), ...values.map((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v; return o; }));
   }
-  const title = (s) => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  const title = (s) => (/^(BYD|GAC|JAC|JMC|MG|DFSK|BMW|MAN)$/.test(s) ? s : s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()));
 
   function setupForm(opt) {
     fillSelect($('f-brand'), opt.brands, true);
