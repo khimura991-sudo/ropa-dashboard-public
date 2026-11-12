@@ -24,24 +24,64 @@
     return rows;
   }
 
+  // Sales history: fmv-data.xlsx next to this page (first sheet, one row per sold unit, column names in row 1).
+  // Falls back to parts 3-4 of the published Google Sheet if there is no Excel file.
+  const COLS = {
+    brand: ['BRAND'], series: ['SERIES', 'MODEL', 'MODEL / SERIES'], product: ['PRODUCT TYPE', 'PRODUCT'], body: ['BODY TYPE', 'BODY'],
+    trans: ['TRANSMISSION/FUEL', 'TRANSMISSION', 'TRANSMISSION / FUEL'], cond: ['CONDITION CLASS (DASH)', 'CONDITION', "CLASSIFICATION OF UNIT'S CONDITION"],
+    year: ['YEAR MODEL', 'YEAR'], km: ['MILEAGE', 'KM'], price: ['SOLD AMOUNT', 'SOLD PRICE', 'PRICE'], date: ['DATE SOLD', 'SOLD DATE', 'DATE'],
+  };
+  const numOf = (v) => (typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/[^0-9.]/g, '')) || 0);
+  function monthOf(v) {
+    if (v instanceof Date && !isNaN(v)) return (v.getFullYear() - 2000) * 12 + v.getMonth();
+    if (typeof v === 'number' && v > 20000) { const d = new Date(Math.round((v - 25569) * 86400000)); return (d.getUTCFullYear() - 2000) * 12 + d.getUTCMonth(); }
+    const s = String(v == null ? '' : v), m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/), iso = s.match(/(\d{4})-(\d{2})/);
+    if (m) return (Number(m[3]) - 2000) * 12 + Number(m[1]) - 1;
+    if (iso) return (Number(iso[1]) - 2000) * 12 + Number(iso[2]) - 1;
+    return null;
+  }
+  function fromSheet(rows) {
+    const head = (rows[0] || []).map((h) => String(h == null ? '' : h).replace(/\s+/g, ' ').trim().toUpperCase());
+    const at = {};
+    Object.keys(COLS).forEach((k) => { at[k] = COLS[k].map((n) => head.indexOf(n)).find((i) => i >= 0); });
+    const missing = ['brand', 'series', 'year', 'price'].filter((k) => at[k] === undefined);
+    if (missing.length) throw new Error('fmv-data.xlsx is missing these columns in row 1: ' + missing.map((k) => COLS[k][0]).join(', ') + '.');
+    const get = (r, k) => (at[k] === undefined ? '' : r[at[k]]);
+    const units = [];
+    let latest = 0;
+    rows.slice(1).forEach((r) => {
+      const price = numOf(get(r, 'price')), year = Math.round(numOf(get(r, 'year')));
+      if (!(price > 0) || year < 1980 || !String(get(r, 'brand') || '').trim()) return;
+      const month = monthOf(get(r, 'date'));
+      if (month != null) latest = Math.max(latest, month);
+      units.push({ brand: get(r, 'brand'), series: get(r, 'series'), product: get(r, 'product'), body: get(r, 'body'), trans: get(r, 'trans'),
+        cond: get(r, 'cond'), year, km: numOf(get(r, 'km')) || null, price, month });
+    });
+    units.forEach((u) => { if (u.month == null) u.month = latest; });
+    if (!units.length) throw new Error('fmv-data.xlsx has no sold units with a sold amount, brand and year model.');
+    return units;
+  }
+
   async function loadFmv() {
-    const useSheet = C.sheetCsvUrl && !/PASTE-/.test(C.sheetCsvUrl);
-    if (!useSheet) {
-      const r = await fetch((C.fmvFile || 'fmv-data.json') + '?t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('No sales history found. Set the Google Sheet link in config.js.');
-      return r.json();
+    const file = C.fmvFile || 'fmv-data.xlsx';
+    const r = await fetch(file + '?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok && window.XLSX) {
+      const wb = XLSX.read(await r.arrayBuffer(), { type: 'array', cellDates: true });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      return { units: fromSheet(rows), asOf: r.headers.get('last-modified') };
     }
-    const url = C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('The published Google Sheet could not be read (' + r.status + ').');
-    const rows = parseCsv(await r.text());
+    const useSheet = C.sheetCsvUrl && !/PASTE-/.test(C.sheetCsvUrl);
+    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    const g = await fetch(C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    const rows = parseCsv(await g.text());
     const head = rows[0].map((h) => h.trim().toLowerCase());
     const pi = head.indexOf('part'), di = head.indexOf('data');
     const parts = rows.slice(1).filter((x) => Number(x[pi]) >= 3 && x[di]).sort((a, b) => Number(a[pi]) - Number(b[pi])).map((x) => x[di]);
-    if (!parts.length) throw new Error('The sales history for the FMV generator is not in the Google Sheet yet. The Power Automate flow needs the two extra steps for parts 3 and 4.');
+    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
     let acc = '';
-    for (const p of parts) { acc += p; try { return JSON.parse(acc); } catch (e) { /* keep joining */ } }
-    throw new Error('The sales history in the Google Sheet is incomplete (the flow may still be writing). Reload in a minute.');
+    for (const p of parts) { acc += p; try { const f = JSON.parse(acc); return { units: FMV.unpack(f), asOf: f.generated_at }; } catch (e) { /* keep joining */ } }
+    throw new Error('The sales history in the Google Sheet is incomplete. Reload in a minute.');
   }
 
   function fillSelect(sel, values, keepFirst) {
@@ -106,12 +146,12 @@
   $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true; });
 
   loadFmv().then((f) => {
-    model = FMV.prepare(FMV.unpack(f));
+    model = FMV.prepare(f.units);
     const opt = FMV.options(model);
     setupForm(opt);
     const months = model.units.map((u) => u.month);
     $('asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
-      (f.generated_at ? ' · Data as of ' + new Date(f.generated_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
+      (f.asOf && !isNaN(new Date(f.asOf)) ? ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
     const c = model.coef;
     $('how-coef').textContent = `about ${pctTxt(Math.exp(c.year) - 1).replace('+', '')} per newer year model, ${pctTxt(Math.exp(c.moderate) - 1)} for moderate issues, ${pctTxt(Math.exp(c.major) - 1)} for major issues, and a small mileage effect`;
     $('how-acc').textContent = 'Tested on our own past sales: for models we have sold several times, the estimate is typically within about 11% of the actual sold amount, and the likely range contains the actual price about 7 times out of 10.';
