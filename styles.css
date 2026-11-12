@@ -1,8 +1,11 @@
 /* ROPA Dashboard — one column of bands on a cool neutral ground with a teal accent; light and dark themes. */
 :root {
-  --bg: #f4f6f7; --panel: #ffffff; --fg: #17202a; --muted: #5d6b78; --line: #dde3e8; --grid: #e9edf0;
-  --accent: #0f7c8c; --accent-2: #c46d2b; --c3: #6a5bb5; --c4: #3d8f4f; --c5: #b5476b; --chart-muted: #c3ccd4;
-  --ok: #1d7a43; --warn: #a86a00; --bad: #b3261e;
+  /* Global Dominion Financing Inc. palette: navy #29265F, gold #FBCB0A */
+  --navy: #29265F; --navy-deep: #1B1940; --gold: #FBCB0A; --gold-deep: #B98A00;
+  --bg: #F5F5FA; --panel: #ffffff; --fg: #1B1940; --muted: #5B5A77; --line: #E2E1EC; --grid: #ECEBF4;
+  --accent: #29265F; --accent-2: #FBCB0A; --c3: #8F8BDB; --c4: #B98A00; --c5: #5B5A77; --chart-muted: #CFCDE3;
+  --ok: #1D7A43; --warn: #A86A00; --bad: #B3261E;
+  --band: #29265F; --band-fg: #ffffff; --band-muted: #C9C7E6;
   --display: "Newsreader", Georgia, "Times New Roman", serif;
   --body: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --r: 10px;
@@ -10,9 +13,10 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1418; --panel: #161d23; --fg: #e6ebef; --muted: #98a6b3; --line: #26313a; --grid: #1f2830;
-    --accent: #3fb6c6; --accent-2: #e2955a; --c3: #a497ea; --c4: #6cc380; --c5: #e07a9c; --chart-muted: #3a4752;
-    --ok: #5cc88a; --warn: #e2a93b; --bad: #f2726a;
+    --bg: #11102A; --panel: #1B1940; --fg: #ECEBF5; --muted: #A9A7C9; --line: #2F2C5E; --grid: #26244F;
+    --accent: #FBCB0A; --accent-2: #8F8BDB; --c3: #E9E8F2; --c4: #B98A00; --c5: #6E6AB8; --chart-muted: #3B3870;
+    --ok: #5CC88A; --warn: #E2A93B; --bad: #F2726A;
+    --band: #211F4E; --band-fg: #ffffff; --band-muted: #B9B7DA;
     color-scheme: dark;
   }
 }
@@ -79,3 +83,15 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .gate-card p { margin: 0; color: var(--muted); line-height: 1.5; }
 .gate-err { color: var(--bad) !important; font-size: 13px; }
 .loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); background: var(--bg); font-size: 14px; }
+
+/* GDFI header band: navy with a gold rule, like the Excel dashboard */
+.rp-head { background: var(--band); color: var(--band-fg); border-radius: var(--r); padding: 22px 24px; border-bottom: 4px solid var(--gold); }
+.rp-head .eyebrow { color: var(--gold); }
+.rp-head .sub, .rp-head .asof, .rp-head .ctl { color: var(--band-muted); }
+.rp-head .sub b { color: var(--band-fg); }
+.rp-head select { background: #ffffff; color: var(--navy-deep); border-color: transparent; }
+.rp-head .btn { background: var(--gold); color: var(--navy-deep); border-color: var(--gold); font-weight: 600; }
+.rp-head .btn:hover { background: #ffd633; }
+.rp-head select:focus-visible, .rp-head .btn:focus-visible { outline-color: var(--gold); }
+.kpi { border-top: 3px solid var(--gold); }
+.btn.primary { background: var(--navy); border-color: var(--navy); }
