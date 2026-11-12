@@ -95,3 +95,37 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .rp-head select:focus-visible, .rp-head .btn:focus-visible { outline-color: var(--gold); }
 .kpi { border-top: 3px solid var(--gold); }
 .btn.primary { background: var(--navy); border-color: var(--navy); }
+
+/* Page tabs in the header band */
+.tabs { display: flex; gap: 4px; margin: -6px 0 14px; flex-wrap: wrap; }
+.tabs a { color: var(--band-muted); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid transparent; }
+.tabs a:hover { color: var(--band-fg); border-color: color-mix(in srgb, var(--band-fg) 30%, transparent); }
+.tabs a[aria-current="page"] { background: var(--gold); color: var(--navy-deep); }
+.tabs a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* FMV generator */
+.fmv-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .fmv-grid { grid-template-columns: 1fr; } }
+.fmv-form .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin-top: 6px; }
+@media (max-width: 520px) { .fmv-form .fields { grid-template-columns: 1fr; } }
+.fld { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 500; color: var(--fg); }
+.fld .req { font-weight: 400; color: var(--muted); font-size: 11px; }
+.fld select, .fld input { width: 100%; min-width: 0; font: inherit; font-size: 15px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.fld input::placeholder { color: var(--muted); opacity: .8; }
+.fld select:focus-visible, .fld input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fmv-form .actions { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.fmv-result { border-top: 3px solid var(--gold); min-height: 220px; }
+.fmv-result .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.fmv-val { font-family: var(--display); font-size: clamp(40px, 7vw, 56px); line-height: 1; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
+.fmv-range .bar { position: relative; height: 10px; border-radius: 999px; background: var(--grid); margin: 8px 0 6px; }
+.fmv-range .band { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.fmv-range .dot { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--accent); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--accent); }
+.fmv-range .ends { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fmv-range .ends .mid { color: var(--muted); font-size: 12px; }
+.fmv-result .basis { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+.pill.good { color: var(--ok); }
+.pill.bad { color: var(--bad); }
+.adj { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.5; display: flex; flex-direction: column; gap: 2px; }
+.how { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.55; display: flex; flex-direction: column; gap: 4px; max-width: 80ch; }
+.fld .fl { display: flex; align-items: baseline; gap: 6px; }
+@media (prefers-color-scheme: dark) { .btn.primary { background: var(--gold); border-color: var(--gold); color: var(--navy-deep); } }

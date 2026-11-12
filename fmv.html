@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ROPA FMV Generator</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="rp">
+    <header class="rp-head">
+      <div>
+        <nav class="tabs" aria-label="Pages"><a href="./">Dashboard</a><a href="fmv.html" aria-current="page">FMV generator</a></nav>
+        <div class="eyebrow">ROPA · Fair market value</div>
+        <h1>What will this unit sell for?</h1>
+        <p class="sub">Enter the unit's details to get a fair market value based on what similar units actually sold for in our past ROPA sales.</p>
+      </div>
+      <div class="ctls"><span class="asof" id="asof">Loading sales history…</span></div>
+    </header>
+    <p class="err" id="load-err" hidden></p>
+
+    <section class="fmv-grid">
+      <form class="card fmv-form" id="fmv-form" novalidate>
+        <h3>Unit details</h3>
+        <div class="fields">
+          <label class="fld"><span class="fl">Brand <span class="req">required</span></span>
+            <select id="f-brand" required><option value="">Choose a brand</option></select></label>
+          <label class="fld"><span class="fl">Model / series <span class="req">required</span></span>
+            <input id="f-series" list="series-list" autocomplete="off" placeholder="e.g. VIOS 1.3 XLE CVT" required>
+            <datalist id="series-list"></datalist></label>
+          <label class="fld"><span class="fl">Year model <span class="req">required</span></span>
+            <select id="f-year" required><option value="">Choose a year</option></select></label>
+          <label class="fld"><span class="fl">Product type</span>
+            <select id="f-product"><option value="">Any</option></select></label>
+          <label class="fld"><span class="fl">Body type</span>
+            <select id="f-body"><option value="">Any</option></select></label>
+          <label class="fld"><span class="fl">Transmission / fuel</span>
+            <select id="f-trans"><option value="">Any</option></select></label>
+          <label class="fld"><span class="fl">Mileage (km)</span>
+            <input id="f-km" type="number" inputmode="numeric" min="0" step="1000" placeholder="e.g. 85000"></label>
+          <label class="fld"><span class="fl">Condition</span>
+            <select id="f-cond">
+              <option value="">Not sure</option>
+              <option>Minor issues</option>
+              <option>Moderate issues</option>
+              <option>Major issues</option>
+            </select></label>
+        </div>
+        <p class="err" id="form-err" hidden></p>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="btn-go" disabled>Get fair market value</button>
+          <button type="reset" class="btn ghost">Clear</button>
+        </div>
+      </form>
+
+      <section class="card fmv-result" id="result" aria-live="polite">
+        <div class="empty" id="result-empty">
+          <h3>Fair market value</h3>
+          <p class="note">Fill in at least the brand, model and year model. The more details you add, the closer the estimate.</p>
+        </div>
+        <div id="result-body" hidden>
+          <div class="lbl">Fair market value</div>
+          <div class="fmv-val" id="r-val"></div>
+          <div class="fmv-range">
+            <div class="bar"><span class="band" id="r-band"></span><span class="dot" id="r-dot"></span></div>
+            <div class="ends"><span id="r-low"></span><span class="mid">Likely selling range</span><span id="r-high"></span></div>
+          </div>
+          <p class="basis"><span class="pill" id="r-conf"></span> <span id="r-basis"></span></p>
+          <ul class="adj" id="r-adj"></ul>
+          <p class="note">An estimate from past ROPA sales, not a formal appraisal. Rounded to the nearest ₱5,000. Actual bids depend on the unit's real condition, documents and demand on the day.</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="card">
+      <h3>How the estimate works</h3>
+      <ol class="how">
+        <li>It finds sold units like this one: the same brand and model first, then the same brand and body type, then the same body type. Closer variants, years, body type, transmission, condition and more recent sales count more.</li>
+        <li>It adjusts each of those sold prices to this unit, using what our own sales show about price differences: <span id="how-coef">year model, mileage, condition and transmission</span>.</li>
+        <li>The fair market value is the middle of those adjusted prices; the likely range covers most of them.</li>
+      </ol>
+      <p class="note" id="how-acc"></p>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="fmv-engine.js"></script>
+  <script src="fmv.js"></script>
+</body>
+</html>
