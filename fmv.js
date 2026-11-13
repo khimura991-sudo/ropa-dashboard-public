@@ -1,5 +1,5 @@
-/* ROPA FMV generator (the FMV menu of index.html): loads the sold-units history from fmv-data.xlsx (or parts 3-4 of the published
- * Google Sheet) and runs the estimate in the browser (fmv-engine.js). Individual past sales are never listed. */
+/* ROPA FMV generator (the FMV menu of index.html): loads the sold-units history from parts 3-4 of the published Google Sheet
+ * (live, written by the Power Automate flow) or, as a backup, fmv-data.xlsx and runs the estimate in the browser (fmv-engine.js). Individual past sales are never listed. */
 (function () {
   'use strict';
   const C = window.ROPA_CONFIG || {};
@@ -29,7 +29,7 @@
   const COLS = {
     brand: ['BRAND'], series: ['SERIES', 'MODEL', 'MODEL / SERIES'], product: ['PRODUCT TYPE', 'PRODUCT'], body: ['BODY TYPE', 'BODY'],
     trans: ['TRANSMISSION/FUEL', 'TRANSMISSION', 'TRANSMISSION / FUEL'], cond: ['CONDITION CLASS (DASH)', 'CONDITION', "CLASSIFICATION OF UNIT'S CONDITION"],
-    year: ['YEAR MODEL', 'YEAR'], km: ['MILEAGE', 'KM'], price: ['SOLD AMOUNT', 'SOLD PRICE', 'PRICE'], date: ['DATE SOLD', 'SOLD DATE', 'DATE'],
+    year: ['YEAR MODEL', 'YEAR'], km: ['MILEAGE', 'KM'], price: ['SOLD AMOUNT', 'SOLD PRICE', 'PRICE'], opb: ['OPB'], date: ['DATE SOLD', 'SOLD DATE', 'DATE'],
   };
   const dayOf = (v) => (window.DASH ? window.DASH.dayOf(v) : null);
   const numOf = (v) => (typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/[^0-9.]/g, '')) || 0);
@@ -58,34 +58,48 @@
       const month = monthOf(get(r, 'date'));
       if (month != null) latest = Math.max(latest, month);
       units.push({ brand: get(r, 'brand'), series: get(r, 'series'), product: get(r, 'product'), body: get(r, 'body'), trans: get(r, 'trans'),
-        cond: get(r, 'cond'), year, km: numOf(get(r, 'km')) || null, price, month, day: dayOf(get(r, 'date')) });
+        cond: get(r, 'cond'), year, km: get(r, 'km'), price, opb: numOf(get(r, 'opb')) || null, month, day: dayOf(get(r, 'date')) });
     });
     units.forEach((u) => { if (u.month == null) u.month = latest; });
     if (!units.length) throw new Error('fmv-data.xlsx has no sold units with a sold amount, brand and year model.');
     return units;
   }
 
+  // Live data first: parts 3-4 of the published Google Sheet, written by the Power Automate flow on every save.
+  // Backup: fmv-data.xlsx next to index.html.
+  async function fromGoogle() {
+    if (!C.sheetCsvUrl || /PASTE-/.test(C.sheetCsvUrl)) return null;
+    try {
+      const g = await fetch(C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+      if (!g.ok) return null;
+      const rows = parseCsv(await g.text());
+      const head = rows[0].map((h) => h.trim().toLowerCase());
+      const pi = head.indexOf('part'), di = head.indexOf('data');
+      const parts = rows.slice(1).filter((x) => Number(x[pi]) >= 3 && x[di]).sort((a, b) => Number(a[pi]) - Number(b[pi])).map((x) => x[di]);
+      let acc = '';
+      for (const p of parts) {
+        acc += p;
+        let f = null;
+        try { f = JSON.parse(acc); } catch (e) { continue; }
+        if (!f || !f.r) return null;
+        const units = FMV.unpack(f);
+        return { units, days: units.map((u) => u.day).filter(Boolean), asOf: f.generated_at, live: true };
+      }
+    } catch (e) { /* fall back to the Excel file */ }
+    return null;
+  }
+  async function fromExcel() {
+    const r = await fetch((C.fmvFile || 'fmv-data.xlsx') + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok || !window.XLSX) return null;
+    const wb = XLSX.read(await r.arrayBuffer(), { type: 'array', cellDates: true });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+    const units = fromSheet(rows);
+    return { units, days: units.allDays, asOf: r.headers.get('last-modified'), live: false };
+  }
   async function loadFmv() {
-    const file = C.fmvFile || 'fmv-data.xlsx';
-    const r = await fetch(file + '?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok && window.XLSX) {
-      const wb = XLSX.read(await r.arrayBuffer(), { type: 'array', cellDates: true });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
-      const units = fromSheet(rows);
-      return { units, days: units.allDays, asOf: r.headers.get('last-modified') };
-    }
-    const useSheet = C.sheetCsvUrl && !/PASTE-/.test(C.sheetCsvUrl);
-    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
-    const g = await fetch(C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
-    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
-    const rows = parseCsv(await g.text());
-    const head = rows[0].map((h) => h.trim().toLowerCase());
-    const pi = head.indexOf('part'), di = head.indexOf('data');
-    const parts = rows.slice(1).filter((x) => Number(x[pi]) >= 3 && x[di]).sort((a, b) => Number(a[pi]) - Number(b[pi])).map((x) => x[di]);
-    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
-    let acc = '';
-    for (const p of parts) { acc += p; try { const f = JSON.parse(acc); return { units: FMV.unpack(f), asOf: f.generated_at }; } catch (e) { /* keep joining */ } }
-    throw new Error('The sales history in the Google Sheet is incomplete. Reload in a minute.');
+    const d = (await fromGoogle()) || (await fromExcel());
+    if (!d) throw new Error('No sales history found yet. Run the Power Automate flow once, or upload fmv-data.xlsx next to index.html.');
+    return d;
   }
 
   function fillSelect(sel, values, keepFirst) {
@@ -188,6 +202,7 @@
     setupForm(opt);
     const months = model.units.map((u) => u.month);
     $('fmv-asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
-      (f.asOf && !isNaN(new Date(f.asOf)) ? ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+      (f.asOf && !isNaN(new Date(f.asOf)) ? (f.live ? ' · Live from Excel, as of ' + new Date(f.asOf).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })) : '');
   }).catch((e) => { const el = $('fmv-err'); el.textContent = e.message; el.hidden = false; $('fmv-asof').textContent = ''; });
 })();

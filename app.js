@@ -310,7 +310,7 @@
     }
   }
 
-  // Sold per day: workdays of the picked month from the sales file (fmv-data.xlsx)
+  // Sold per day: workdays of the picked month from the sales history (live FMV DATA, or fmv-data.xlsx as a backup)
   function drawCalendar(i) {
     const box = $('cal'), note = $('cal-note'), sum = $('cal-sum');
     sum.replaceChildren();
@@ -322,7 +322,7 @@
     // "So far" ends at the last day in the sales file, so days the file doesn't cover yet don't count as zero
     const lastDay = days.reduce((a, b) => (b > a ? b : a), ''), now = new Date(), lastD = new Date(lastDay + 'T00:00:00');
     const upTo = lastD < now ? lastD : now, cal = DASH.workdayCalendar(inMonth, year, i, upTo), todayIso = DASH.dayOf(upTo);
-    note.textContent = `From the sales file (fmv-data.xlsx), data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}. ` +
+    note.textContent = `${SALES.live ? 'Live from the SOLD sheet (FMV DATA)' : 'From the sales file (fmv-data.xlsx)'}, data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}. ` +
       (cal.weekendUnits ? `${int(cal.weekendUnits)} weekend unit${cal.weekendUnits === 1 ? ' is' : 's are'} added to the Friday before. ` : '') +
       'Gold days are at or above the daily average. The count can differ slightly from Total units sold, which comes from the Google Sheet.';
     const kids = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((w) => el('div', 'wd', w));
@@ -350,7 +350,7 @@
     const rows = DASH.topBrandModels(SALES.units, dataYear(), i, window.FMV);
     const lastDay = (SALES.days || []).reduce((a, b) => (b > a ? b : a), '');
     const through = lastDay ? ` Data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}.` : '';
-    note.textContent = (rows.length ? 'Ranked by units sold, from the sales file (fmv-data.xlsx). Loss per brand isn\'t in the data yet.' : 'No daily data for this month in the sales file.') + through;
+    note.textContent = (rows.length ? `Ranked by units sold, ${SALES.live ? 'live from the SOLD sheet (FMV DATA)' : 'from the sales file (fmv-data.xlsx)'}. Loss per brand isn't in the data yet.` : 'No daily data for this month in the sales file.') + through;
     fill('brands', rows.map((r, k) => ({ ...r, k: k + 1 })), [[(r) => String(r.k)], [(r) => titleCase(r.name)], [(r) => int(r.units)], [(r) => pesoFull(r.amount)]]);
   }
 

@@ -14,20 +14,31 @@
   const dec = (s) => { let n = 0; for (const ch of s) n = n * 62 + B62.indexOf(ch); return n; };
 
   // ---------------------------------------------------------------- unpack the export
-  // f = { B: brands, M: series, P: products, Y: body types, T: transmissions, C: conditions, r: packed rows }
-  // Each row is 20 characters (base 62): brand(2) series(2) product(2) body(2) trans(2) cond(2) year(1) km(2) price(3) month(2)
-  // km is in thousands (zz = unknown), price in thousands of pesos, month = (year - 2000) * 12 + month index.
+  // f = { B: brands, M: series, P: products, Y: body types, T: transmissions, C: conditions, r: packed rows, w: row width }
+  // Each row (base 62): brand(2) series(2) product(2) body(2) trans(2) cond(2) year(1) km(2) price(3), then
+  //   w = 20: month(2)   w = 23: opb(3) month(2)   w = 24: opb(3) day(3)
+  // km is in thousands (zz = unknown), price and OPB in thousands of pesos, month = (year - 2000) * 12 + month index,
+  // day = days since 1 Jan 2000 (0 = unknown).
+  const isoDay = (d) => { const t = new Date(Date.UTC(2000, 0, 1) + d * 864e5); return t.toISOString().slice(0, 10); };
   function unpack(f) {
-    const out = [], W = 20;
+    const out = [], W = f.w || 20, hasOpb = W >= 23;
     for (let i = 0; i + W <= f.r.length; i += W) {
       const s = f.r.substr(i, W);
       const km = dec(s.substr(13, 2));
-      out.push({
+      const u = {
         brand: f.B[dec(s.substr(0, 2))], series: f.M[dec(s.substr(2, 2))], product: f.P[dec(s.substr(4, 2))],
         body: f.Y[dec(s.substr(6, 2))], trans: f.T[dec(s.substr(8, 2))], cond: f.C[dec(s.substr(10, 2))], year: 1980 + dec(s[12]),
-        km: km === 3843 ? null : km * 1000, price: dec(s.substr(15, 3)) * 1000, month: dec(s.substr(18, 2)),
-      });
+        km: km === 3843 ? null : km * 1000, price: dec(s.substr(15, 3)) * 1000, opb: hasOpb ? dec(s.substr(18, 3)) * 1000 || null : null,
+      };
+      if (W >= 24) {
+        const d = dec(s.substr(21, 3));
+        u.day = d ? isoDay(d) : null;
+        u.month = d ? (Number(u.day.slice(0, 4)) - 2000) * 12 + Number(u.day.slice(5, 7)) - 1 : null;
+      } else u.month = dec(s.substr(hasOpb ? 21 : 18, 2));
+      out.push(u);
     }
+    const last = out.reduce((m, u) => Math.max(m, u.month || 0), 0);
+    out.forEach((u) => { if (u.month == null) u.month = last; });
     return out;
   }
 
