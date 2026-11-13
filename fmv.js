@@ -111,20 +111,24 @@
   function setupForm(opt) {
     fillSelect($('f-brand'), opt.brands, true);
     [...$('f-brand').options].slice(1).forEach((o) => { o.textContent = title(o.value); });
-    // Product type: only the types the chosen brand + model was actually sold under (all types until a known model is entered)
-    const updProducts = () => {
-      const sel = $('f-product'), keep = sel.value;
-      const list = FMV.productsFor(model, $('f-brand').value, $('f-series').value.trim()) || opt.products;
+    // Product type, body type and transmission / fuel: only what the chosen brand + model was actually sold with
+    // (the full lists until a known model is entered). A choice that no longer fits goes back to "Any".
+    const FIELDS = [
+      ['f-product', 'product', opt.products, title],
+      ['f-body', 'body', opt.bodies.filter((x) => x !== 'Other'), (x) => x],
+      ['f-trans', 'trans', opt.trans.filter((x) => x !== 'Other'), (x) => x],
+    ];
+    const updChoices = () => FIELDS.forEach(([id, field, all, label]) => {
+      const sel = $(id), keep = sel.value;
+      const list = FMV.valuesFor(model, $('f-brand').value, $('f-series').value.trim(), field) || all;
       fillSelect(sel, list, true);
-      [...sel.options].slice(1).forEach((o) => { o.textContent = title(o.value); });
+      [...sel.options].slice(1).forEach((o) => { o.textContent = label(o.value); });
       sel.value = list.includes(keep) ? keep : '';
-    };
-    updProducts();
-    $('f-brand').addEventListener('change', updProducts);
-    $('f-series').addEventListener('change', updProducts);
-    $('f-series').addEventListener('input', updProducts);
-    fillSelect($('f-body'), opt.bodies.filter((b) => b !== 'Other'), true);
-    fillSelect($('f-trans'), opt.trans.filter((t) => t !== 'Other'), true);
+    });
+    updChoices();
+    $('f-brand').addEventListener('change', updChoices);
+    $('f-series').addEventListener('change', updChoices);
+    $('f-series').addEventListener('input', updChoices);
     const now = new Date().getFullYear() + 1, years = [];
     for (let y = now; y >= 1990; y--) years.push(String(y));
     fillSelect($('f-year'), years, true);
@@ -194,10 +198,15 @@
       body: $('f-body').value, trans: $('f-trans').value, km: $('f-km').value, cond: $('f-cond').value };
     const err = $('form-err');
     if (!q.brand || !q.series || !q.year) { err.textContent = 'Please fill in the brand, model / series and year model.'; err.hidden = false; return; }
-    const sold = q.product ? FMV.productsFor(model, q.brand, q.series) : null;
-    if (sold && !sold.includes(q.product)) {
+    const NAMES = { product: 'Product type', body: 'Body type', trans: 'Transmission / fuel' };
+    for (const f of ['product', 'body', 'trans']) {
+      const sold = q[f] ? FMV.valuesFor(model, q.brand, q.series, f) : null;
+      if (!sold || sold.includes(q[f])) continue;
+      const lab = f === 'product' ? title : (x) => x, unit = `${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))}`;
       $('result-empty').hidden = false; $('result-body').hidden = true; lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true;
-      err.textContent = `No ${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))} has been sold under ${title(q.product)}. Choose "Any" or one of: ${sold.map(title).join(', ')}.`;
+      err.textContent = f === 'product'
+        ? `No ${unit} has been sold under ${lab(q[f])}. Choose "Any" or one of: ${sold.map(lab).join(', ')}.`
+        : `No ${unit} has been sold with ${NAMES[f].toLowerCase()} "${lab(q[f])}". Choose "Any" or one of: ${sold.map(lab).join(', ')}.`;
       err.hidden = false; return;
     }
     err.hidden = true;
