@@ -61,16 +61,24 @@
     return { weeks, total, workdaysSoFar, average: workdaysSoFar ? total / workdaysSoFar : 0, weekendUnits };
   }
 
-  // Most sold brand + model in a month (from the sales file), most units first.
+  // Most sold brand + model in a month (from the sales history), most units first.
+  // With OPB: gain = sold amount - OPB and recovery = sold amount / OPB, over the units that have an OPB.
+  // The returned list carries .total = { gain, opbUnits, units } for the whole month (for "% of net loss").
   function topBrandModels(units, year, month0, fmv, n) {
-    const pre = iso(year, month0, 1).slice(0, 8), g = new Map();
+    const pre = iso(year, month0, 1).slice(0, 8), g = new Map(), total = { gain: 0, opbUnits: 0, units: 0 };
     (units || []).forEach((u) => {
       if (!u.day || u.day.slice(0, 8) !== pre) return;
       const name = (fmv.cleanBrand(u.brand) + ' ' + (fmv.modelOf(u.series, u.brand) || fmv.cleanSeries(u.series, u.brand))).trim();
-      const r = g.get(name) || { name, units: 0, amount: 0 };
-      r.units += 1; r.amount += Number(u.price) || 0; g.set(name, r);
+      const r = g.get(name) || { name, units: 0, amount: 0, opb: 0, opbSold: 0, opbUnits: 0 };
+      const price = Number(u.price) || 0, opb = Number(u.opb) || 0;
+      r.units += 1; r.amount += price; total.units += 1;
+      if (opb > 0) { r.opb += opb; r.opbSold += price; r.opbUnits += 1; total.gain += price - opb; total.opbUnits += 1; }
+      g.set(name, r);
     });
-    return Array.from(g.values()).sort((a, b) => b.units - a.units || b.amount - a.amount || a.name.localeCompare(b.name)).slice(0, n || 10);
+    const out = Array.from(g.values()).map((r) => ({ ...r, gain: r.opbUnits ? r.opbSold - r.opb : null, rec: r.opbUnits ? r.opbSold / r.opb : null }))
+      .sort((a, b) => b.units - a.units || b.amount - a.amount || a.name.localeCompare(b.name)).slice(0, n || 10);
+    out.total = total;
+    return out;
   }
 
   // Units of the month that lost at least `min` (default 300K), biggest loss first, at most 10.

@@ -65,3 +65,21 @@ test('invKpis sums on hand, under legal and for sale', () => {
   assert.equal(invKpis([]), null);
   assert.equal(invKpis(null), null);
 });
+
+test('topBrandModels adds loss and recovery from OPB, and the month total', () => {
+  const fmv = { cleanBrand: (s) => s.toUpperCase(), modelOf: (s) => s.split(' ')[0].toUpperCase(), cleanSeries: (s) => s.toUpperCase() };
+  const units = [
+    { brand: 'toyota', series: 'vios', price: 400000, opb: 500000, day: '2026-11-03' },
+    { brand: 'toyota', series: 'vios', price: 300000, opb: null, day: '2026-11-04' }, // no OPB: counted as sold, left out of loss
+    { brand: 'ford', series: 'ranger', price: 600000, opb: 900000, day: '2026-11-05' },
+    { brand: 'ford', series: 'ranger', price: 100000, opb: 999000, day: '2026-10-05' }, // other month
+  ];
+  const r = topBrandModels(units, 2026, 10, fmv);
+  const vios = r.find((x) => x.name === 'TOYOTA VIOS'), ranger = r.find((x) => x.name === 'FORD RANGER');
+  assert.deepEqual([vios.units, vios.amount, vios.gain, vios.opbUnits], [2, 700000, -100000, 1]);
+  assert.equal(vios.rec, 0.8);
+  assert.deepEqual([ranger.gain, ranger.rec], [-300000, 600000 / 900000]);
+  assert.deepEqual(r.total, { gain: -400000, opbUnits: 2, units: 3 });
+  const none = topBrandModels(units.map((u) => ({ ...u, opb: null })), 2026, 10, fmv);
+  assert.equal(none[0].gain, null); assert.equal(none[0].rec, null); assert.equal(none.total.opbUnits, 0);
+});
