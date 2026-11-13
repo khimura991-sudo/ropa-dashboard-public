@@ -106,24 +106,43 @@
     const first = keepFirst ? sel.options[0] : null;
     sel.replaceChildren(...(first ? [first] : []), ...values.map((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v; return o; }));
   }
+  const OTHER = '__other__';
+  const seriesOf = () => ($('f-series').value === OTHER ? '' : $('f-series').value);
   const title = (s) => (/^(BYD|GAC|JAC|JMC|MG|DFSK|BMW|MAN)$/.test(s) ? s : s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()));
 
   function setupForm(opt) {
     fillSelect($('f-brand'), opt.brands, true);
     [...$('f-brand').options].slice(1).forEach((o) => { o.textContent = title(o.value); });
-    fillSelect($('f-product'), opt.products, true);
-    [...$('f-product').options].slice(1).forEach((o) => { o.textContent = title(o.value); });
-    fillSelect($('f-body'), opt.bodies.filter((b) => b !== 'Other'), true);
-    fillSelect($('f-trans'), opt.trans.filter((t) => t !== 'Other'), true);
-    const now = new Date().getFullYear() + 1, years = [];
-    for (let y = now; y >= 1990; y--) years.push(String(y));
-    fillSelect($('f-year'), years, true);
+    // Model / series: a dropdown of the brand's models, most sold first, plus "Other model" for one not sold yet.
+    // Changing the brand resets it, so a model is never carried over to another brand.
     const updSeries = () => {
-      const list = opt.seriesBy[$('f-brand').value] || [];
-      $('series-list').replaceChildren(...list.map((s) => { const o = document.createElement('option'); o.value = s; return o; }));
+      const sel = $('f-series'), brand = $('f-brand').value, list = opt.seriesBy[brand] || [];
+      const o = (v, t) => { const x = document.createElement('option'); x.value = v; x.textContent = t; return x; };
+      sel.replaceChildren(o('', brand ? 'Choose a model' : 'Choose a brand first'), ...list.map((m) => o(m, title(m))), ...(brand ? [o(OTHER, 'Other model (not in the list)')] : []));
+      sel.value = ''; // a new brand always starts with "Choose a model"
     };
     $('f-brand').addEventListener('change', updSeries);
     updSeries();
+    // Product type, body type and transmission / fuel: only what the chosen brand + model was actually sold with
+    // (the full lists until a known model is entered). A choice that no longer fits goes back to "Any".
+    const FIELDS = [
+      ['f-product', 'product', opt.products, title],
+      ['f-body', 'body', opt.bodies.filter((x) => x !== 'Other'), (x) => x],
+      ['f-trans', 'trans', opt.trans.filter((x) => x !== 'Other'), (x) => x],
+    ];
+    const updChoices = () => FIELDS.forEach(([id, field, all, label]) => {
+      const sel = $(id), keep = sel.value;
+      const list = FMV.valuesFor(model, $('f-brand').value, seriesOf(), field) || all;
+      fillSelect(sel, list, true);
+      [...sel.options].slice(1).forEach((o) => { o.textContent = label(o.value); });
+      sel.value = list.includes(keep) ? keep : '';
+    });
+    updChoices();
+    $('f-brand').addEventListener('change', updChoices);
+    $('f-series').addEventListener('change', updChoices);
+    const now = new Date().getFullYear() + 1, years = [];
+    for (let y = now; y >= 1990; y--) years.push(String(y));
+    fillSelect($('f-year'), years, true);
     $('btn-go').disabled = false;
   }
 
@@ -141,6 +160,7 @@
     const when = e.fromMonth === e.toMonth ? monthName(e.toMonth) : monthName(e.fromMonth) + ' – ' + monthName(e.toMonth);
     $('r-basis').textContent = e.sameModel > 0
       ? `Based on ${e.sameModel} sold ${title(q.brand)} ${title(e.model)} unit${e.sameModel === 1 ? '' : 's'}` + (e.comps > e.sameModel ? ` plus ${e.comps - e.sameModel} similar units` : '') + `, sold ${when}.`
+      : !e.model ? `This model isn't in the sales history yet, so this uses ${e.comps} similar units (${e.level}), sold ${when}. Treat it as a rough guide.`
       : `No ${title(q.brand)} ${title(e.model)} has been sold yet, so this uses ${e.comps} similar units (${e.level}), sold ${when}. Treat it as a rough guide.`;
     const c = model.coef, li = [];
     li.push(`Year model: each newer year adds about ${pctTxt(Math.exp(c.year) - 1).replace('+', '')} to the price.`);
@@ -178,12 +198,38 @@
     renderComps();
   }
 
+  // Any change to the form hides the last result, so a value is never shown for details that no longer match
+  function clearResult() {
+    $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
+    lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true;
+    $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.';
+  }
+  $('fmv-form').addEventListener('input', clearResult);
+  $('fmv-form').addEventListener('change', clearResult);
+
   $('fmv-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
-    const q = { brand: $('f-brand').value, series: $('f-series').value.trim(), year: $('f-year').value, product: $('f-product').value,
+    const q = { brand: $('f-brand').value, series: seriesOf(), year: $('f-year').value, product: $('f-product').value,
       body: $('f-body').value, trans: $('f-trans').value, km: $('f-km').value, cond: $('f-cond').value };
     const err = $('form-err');
-    if (!q.brand || !q.series || !q.year) { err.textContent = 'Please fill in the brand, model / series and year model.'; err.hidden = false; return; }
+    if (!q.brand || !$('f-series').value || !q.year) { err.textContent = 'Please fill in the brand, model / series and year model.'; err.hidden = false; return; }
+    const owners = FMV.brandsWithModel(model, q.series);
+    if (owners.length && !owners.includes(q.brand)) {
+      clearResult();
+      err.textContent = `No ${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))} has been sold. ${title(FMV.modelOf(q.series, q.brand))} is sold under ${owners.map(title).join(', ')}. Check the brand.`;
+      err.hidden = false; return;
+    }
+    const NAMES = { product: 'Product type', body: 'Body type', trans: 'Transmission / fuel' };
+    for (const f of ['product', 'body', 'trans']) {
+      const sold = q[f] ? FMV.valuesFor(model, q.brand, q.series, f) : null;
+      if (!sold || sold.includes(q[f])) continue;
+      const lab = f === 'product' ? title : (x) => x, unit = `${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))}`;
+      clearResult();
+      err.textContent = f === 'product'
+        ? `No ${unit} has been sold under ${lab(q[f])}. Choose "Any" or one of: ${sold.map(lab).join(', ')}.`
+        : `No ${unit} has been sold with ${NAMES[f].toLowerCase()} "${lab(q[f])}". Choose "Any" or one of: ${sold.map(lab).join(', ')}.`;
+      err.hidden = false; return;
+    }
     err.hidden = true;
     const e = FMV.estimate(model, q);
     if (!e) { err.textContent = 'There are no similar sold units to compare with yet. Try adding the body type.'; err.hidden = false; return; }
@@ -191,8 +237,7 @@
     showComps(e);
     if (window.matchMedia('(max-width: 860px)').matches) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
-    lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
+  $('fmv-form').addEventListener('reset', clearResult);
 
   // The dashboard's Sales and Losses menus use the same sales history (sold per day, brand/series).
   window.ROPA_SALES = loadFmv();

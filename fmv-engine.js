@@ -162,6 +162,25 @@
     };
   }
 
+  // Values a brand + model was actually sold with, most common first, for field 'product', 'body' or 'trans'
+  // ("Not specified" left out); null when that model has no sales (no restriction then)
+  const FIELD = { product: 'productN', body: 'bodyN', trans: 'transN' };
+  function valuesFor(m, brand, series, field) {
+    const b = cleanBrand(brand), mo = modelOf(series, brand), f = FIELD[field];
+    if (!b || !mo || !f) return null;
+    const key = b + '|' + mo, c = {};
+    m.units.forEach((u) => { const v = u[f]; if (u.key === key && v && v !== 'Not specified') c[v] = (c[v] || 0) + 1; });
+    const list = Object.keys(c).sort((x, y) => c[y] - c[x]);
+    return list.length ? list : null;
+  }
+  const productsFor = (m, brand, series) => valuesFor(m, brand, series, 'product');
+  // Brands a model name was sold under, most first (e.g. VIOS -> TOYOTA); used to catch a model typed under the wrong brand
+  function brandsWithModel(m, series) {
+    const mo = modelOf(series, ''), c = {};
+    if (!mo) return [];
+    m.units.forEach((u) => { if (u.model === mo) c[u.brandN] = (c[u.brandN] || 0) + 1; });
+    return Object.keys(c).sort((x, y) => c[y] - c[x]);
+  }
   function prepare(raw) {
     const units = raw.filter((u) => u.price > 0).map((u) => {
       const brand = cleanBrand(u.brand), series = cleanSeries(u.series, u.brand), model = modelOf(u.series, u.brand);
@@ -259,6 +278,6 @@
     return { brands: count((u) => u.brandN).sort(), products: count((u) => u.productN), bodies: count((u) => u.bodyN), trans: count((u) => u.transN), seriesBy };
   }
 
-  const api = { unpack, prepare, estimate, options, normBody, normTrans, normCond, normKm, modelOf, cleanBrand, cleanSeries, B62 };
+  const api = { unpack, prepare, estimate, options, productsFor, valuesFor, brandsWithModel, normBody, normTrans, normCond, normKm, modelOf, cleanBrand, cleanSeries, B62 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FMV = api;
 })(typeof window !== 'undefined' ? window : this);
