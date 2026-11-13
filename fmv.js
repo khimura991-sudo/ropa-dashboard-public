@@ -65,45 +65,6 @@
     return units;
   }
 
-  // Market reference: hand-kept asking prices in market-prices.xlsx (missing file = no market prices)
-  let market = [];
-  async function loadMarket() {
-    try {
-      const r = await fetch((C.marketFile || 'market-prices.xlsx') + '?t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok || !window.XLSX || !window.DASH) return;
-      const wb = XLSX.read(await r.arrayBuffer(), { type: 'array', cellDates: true });
-      market = DASH.parseMarket(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' }));
-    } catch (e) { market = []; }
-  }
-  const marketLoaded = loadMarket();
-  const k = (v) => '₱' + Math.round(v / 1000).toLocaleString('en-PH') + 'K';
-  function showMarket(e, q) {
-    const box = $('market'), rows = $('mkt-rows'), gap = $('mkt-gap'), note = $('mkt-note');
-    box.hidden = false; rows.replaceChildren(); gap.hidden = true;
-    const ref = window.DASH ? DASH.marketRef(market, q, FMV, new Date(), e.fmv) : null;
-    if (!ref) { note.textContent = `No market prices recorded yet for ${title(q.brand)} ${title(e.model || q.series)} ${q.year} in the last 3 months. Add listings to market-prices.xlsx to see them here.`; return; }
-    note.textContent = 'Asking prices recorded by hand from listing sites in the last 3 months' + (ref.yearNote ? ', using year models within ±1 year (none for ' + q.year + ')' : '') + '. Asking prices are usually above what units sell for. The gold dot is the ROPA estimate.';
-    const all = [e.fmv]; [ref.repo, ref.used].forEach((s) => { if (s) all.push(s.low, s.high); });
-    const lo = Math.min(...all) * 0.9, hi = Math.max(...all) * 1.05, pos = (v) => ((v - lo) / (hi - lo)) * 100;
-    [['Bank repo listings', ref.repo, 'repo'], ['Regular used listings', ref.used, 'used']].forEach(([label, st, cls]) => {
-      const r = document.createElement('div'); r.className = 'mkt-row';
-      const t = document.createElement('div'); t.className = 'mkt-t';
-      const b = document.createElement('b'); b.textContent = label;
-      const v = document.createElement('span');
-      v.textContent = st ? (st.n === 1 ? k(st.low) : k(st.low) + ' – ' + k(st.high)) + ` · ${st.n} listing${st.n === 1 ? '' : 's'}` : 'None recorded';
-      t.append(b, v);
-      const bar = document.createElement('div'); bar.className = 'bar';
-      if (st) { const band = document.createElement('i'); band.className = cls; band.style.left = pos(st.low) + '%'; band.style.width = Math.max(1.5, pos(st.high) - pos(st.low)) + '%'; bar.appendChild(band); }
-      const dot = document.createElement('span'); dot.className = 'dot'; dot.style.left = pos(e.fmv) + '%'; bar.appendChild(dot);
-      r.append(t, bar); rows.appendChild(r);
-    });
-    const parts = [];
-    if (ref.repo) parts.push(`about ${Math.round(ref.repo.pct * 100)}% of the bank repo asking price`);
-    if (ref.used) parts.push(`about ${Math.round(ref.used.pct * 100)}% of regular used listings`);
-    gap.textContent = `The ROPA estimate is ${parts.join(' and ')} for this model (middle asking price).`;
-    gap.hidden = false;
-  }
-
   async function loadFmv() {
     const file = C.fmvFile || 'fmv-data.xlsx';
     const r = await fetch(file + '?t=' + Date.now(), { cache: 'no-store' });
@@ -214,10 +175,9 @@
     if (!e) { err.textContent = 'There are no similar sold units to compare with yet. Try adding the body type.'; err.hidden = false; return; }
     show(e, q);
     showComps(e);
-    marketLoaded.then(() => showMarket(e, q));
     if (window.matchMedia('(max-width: 860px)').matches) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  $('fmv-form').addEventListener('reset', () => { $('market').hidden = true; $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
+  $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
     lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
 
   // The dashboard's Sales and Losses menus use the same sales history (sold per day, brand/series).
