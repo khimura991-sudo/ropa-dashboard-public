@@ -111,8 +111,18 @@
   function setupForm(opt) {
     fillSelect($('f-brand'), opt.brands, true);
     [...$('f-brand').options].slice(1).forEach((o) => { o.textContent = title(o.value); });
-    fillSelect($('f-product'), opt.products, true);
-    [...$('f-product').options].slice(1).forEach((o) => { o.textContent = title(o.value); });
+    // Product type: only the types the chosen brand + model was actually sold under (all types until a known model is entered)
+    const updProducts = () => {
+      const sel = $('f-product'), keep = sel.value;
+      const list = FMV.productsFor(model, $('f-brand').value, $('f-series').value.trim()) || opt.products;
+      fillSelect(sel, list, true);
+      [...sel.options].slice(1).forEach((o) => { o.textContent = title(o.value); });
+      sel.value = list.includes(keep) ? keep : '';
+    };
+    updProducts();
+    $('f-brand').addEventListener('change', updProducts);
+    $('f-series').addEventListener('change', updProducts);
+    $('f-series').addEventListener('input', updProducts);
     fillSelect($('f-body'), opt.bodies.filter((b) => b !== 'Other'), true);
     fillSelect($('f-trans'), opt.trans.filter((t) => t !== 'Other'), true);
     const now = new Date().getFullYear() + 1, years = [];
@@ -184,6 +194,12 @@
       body: $('f-body').value, trans: $('f-trans').value, km: $('f-km').value, cond: $('f-cond').value };
     const err = $('form-err');
     if (!q.brand || !q.series || !q.year) { err.textContent = 'Please fill in the brand, model / series and year model.'; err.hidden = false; return; }
+    const sold = q.product ? FMV.productsFor(model, q.brand, q.series) : null;
+    if (sold && !sold.includes(q.product)) {
+      $('result-empty').hidden = false; $('result-body').hidden = true; lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true;
+      err.textContent = `No ${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))} has been sold under ${title(q.product)}. Choose "Any" or one of: ${sold.map(title).join(', ')}.`;
+      err.hidden = false; return;
+    }
     err.hidden = true;
     const e = FMV.estimate(model, q);
     if (!e) { err.textContent = 'There are no similar sold units to compare with yet. Try adding the body type.'; err.hidden = false; return; }

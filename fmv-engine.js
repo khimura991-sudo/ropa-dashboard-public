@@ -162,6 +162,15 @@
     };
   }
 
+  // Product types a brand + model was actually sold under, most first; null when that model has no sales (no restriction then)
+  function productsFor(m, brand, series) {
+    const b = cleanBrand(brand), mo = modelOf(series, brand);
+    if (!b || !mo) return null;
+    const key = b + '|' + mo, c = {};
+    m.units.forEach((u) => { if (u.key === key && u.productN) c[u.productN] = (c[u.productN] || 0) + 1; });
+    const list = Object.keys(c).sort((x, y) => c[y] - c[x]);
+    return list.length ? list : null;
+  }
   function prepare(raw) {
     const units = raw.filter((u) => u.price > 0).map((u) => {
       const brand = cleanBrand(u.brand), series = cleanSeries(u.series, u.brand), model = modelOf(u.series, u.brand);
@@ -259,6 +268,6 @@
     return { brands: count((u) => u.brandN).sort(), products: count((u) => u.productN), bodies: count((u) => u.bodyN), trans: count((u) => u.transN), seriesBy };
   }
 
-  const api = { unpack, prepare, estimate, options, normBody, normTrans, normCond, normKm, modelOf, cleanBrand, cleanSeries, B62 };
+  const api = { unpack, prepare, estimate, options, productsFor, normBody, normTrans, normCond, normKm, modelOf, cleanBrand, cleanSeries, B62 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FMV = api;
 })(typeof window !== 'undefined' ? window : this);
