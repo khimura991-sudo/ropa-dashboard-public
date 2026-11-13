@@ -350,8 +350,15 @@
     const rows = DASH.topBrandModels(SALES.units, dataYear(), i, window.FMV);
     const lastDay = (SALES.days || []).reduce((a, b) => (b > a ? b : a), '');
     const through = lastDay ? ` Data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}.` : '';
-    note.textContent = (rows.length ? `Ranked by units sold, ${SALES.live ? 'live from the SOLD sheet (FMV DATA)' : 'from the sales file (fmv-data.xlsx)'}. Loss per brand isn't in the data yet.` : 'No daily data for this month in the sales file.') + through;
-    fill('brands', rows.map((r, k) => ({ ...r, k: k + 1 })), [[(r) => String(r.k)], [(r) => titleCase(r.name)], [(r) => int(r.units)], [(r) => pesoFull(r.amount)]]);
+    const T = rows.total || { gain: 0, opbUnits: 0, units: 0 };
+    const opbNote = !T.opbUnits ? ' Total loss and recovery rate need the OPB of each unit, which this data doesn\'t have yet.'
+      : (T.opbUnits < T.units ? ` ${int(T.units - T.opbUnits)} of ${int(T.units)} units have no OPB and are left out of loss and recovery.` : '') +
+        ' Total loss is sold amount minus OPB; % of net loss is the share of this month\'s net loss in the same data.';
+    note.textContent = (rows.length ? `Ranked by units sold, ${SALES.live ? 'live from the SOLD sheet (FMV DATA)' : 'from the sales file (fmv-data.xlsx)'}.` + opbNote : 'No daily data for this month in the sales file.') + through;
+    fill('brands', rows.map((r, k) => ({ ...r, k: k + 1 })), [[(r) => String(r.k)], [(r) => titleCase(r.name)], [(r) => int(r.units)], [(r) => pesoFull(r.amount)],
+      [(r) => (r.gain == null ? '—' : pesoFull(r.gain)), (r) => (r.gain < 0 ? 'bad' : null)],
+      [(r) => (r.gain == null || !T.gain ? '—' : pct(r.gain / T.gain))],
+      [(r) => (r.rec == null ? '—' : pct(r.rec)), (r) => (r.rec == null ? null : 'pill ' + recClass(r.rec))]]);
   }
 
   // Inventory breakdown: picked month vs the month before
