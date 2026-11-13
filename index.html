@@ -12,70 +12,163 @@
 </head>
 <body>
 
-  <!-- Dashboard -->
-  <div class="rp" id="app" hidden>
-    <header class="rp-head">
-      <div>
-        <nav class="tabs" aria-label="Pages"><a href="./" aria-current="page">Dashboard</a><a href="fmv.html">FMV generator</a></nav>
-        <div class="eyebrow">ROPA · Sales performance</div>
-        <h1 id="title">Sales overview</h1>
+  <div class="shell" id="app" hidden>
+    <aside class="side">
+      <div class="logo"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#29265F"/><rect x="13" y="34" width="9" height="17" rx="2" fill="#FBCB0A" opacity=".55"/><rect x="27.5" y="25" width="9" height="26" rx="2" fill="#FBCB0A" opacity=".8"/><rect x="42" y="14" width="9" height="37" rx="2" fill="#FBCB0A"/></svg><div><b>ROPA</b><span>Sales performance</span></div></div>
+      <nav class="nav" id="nav" aria-label="Menu">
+        <a href="#overview" data-view="overview">Overview</a>
+        <a href="#sales" data-view="sales">Sales</a>
+        <a href="#losses" data-view="losses">Losses</a>
+        <a href="#inventory" data-view="inventory">Inventory</a>
+        <a href="#fmv" data-view="fmv">FMV generator</a>
+      </nav>
+      <div class="side-foot">
+        <span class="asof" id="asof"></span>
+        <button type="button" class="btn" id="btn-refresh">Refresh</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <div class="live" id="live"><i></i><span id="live-txt"></span></div>
+        <h1 id="view-title">Overview</h1>
         <p class="sub" id="takeaway"></p>
-      </div>
-      <div class="ctls">
-        <label class="ctl" for="month">Month<select id="month"></select></label>
-        <div class="row">
-          <span class="asof" id="asof"></span>
-          <button type="button" class="btn" id="btn-refresh">Refresh</button>
+        <div class="months" id="months" role="group" aria-label="Month"></div>
+      </header>
+      <p class="err" id="load-err" hidden></p>
+
+      <!-- Overview -->
+      <section class="view" data-view="overview">
+        <div class="kpis" id="kpis"></div>
+        <div class="grid2">
+          <div class="card"><h3>Monthly sales, 2026 vs 2025</h3>
+            <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
+            <div class="chart" id="line"></div></div>
+          <div class="card"><h3>Units sold, 2026 vs 2025</h3>
+            <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
+            <div class="chart" id="bars"></div></div>
         </div>
-      </div>
-    </header>
-    <p class="err" id="load-err" hidden></p>
+        <div class="grid2 wide-left">
+          <div class="card"><h3>Top 5 product types sold, with recovery rate</h3>
+            <p class="note">Recovery rate is sold amount ÷ OPB. Green meets the target, amber is within 10 points, red is below that.</p>
+            <div class="tw"><table id="top5"><thead><tr><th>Product type</th><th>Units sold</th><th>Total amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div></div>
+          <div class="card"><h3>Sold by division</h3><div class="donut" id="div"></div></div>
+        </div>
+      </section>
 
-    <section class="kpis" id="kpis"></section>
+      <!-- Sales -->
+      <section class="view" data-view="sales" hidden>
+        <div class="kpis" id="sales-kpis"></div>
+        <div class="grid2 wide-right">
+          <div class="card"><h3>Sold by sales associate</h3><p class="note">Units sold, highest first. PINNACLE is left out, as in the workbook.</p><div class="chart small" id="assoc"></div></div>
+          <div class="card"><h3>Sold per day</h3><p class="note" id="cal-note"></p><div class="cal" id="cal"></div></div>
+        </div>
+      </section>
 
-    <section class="grid2">
-      <div class="card"><h3>Monthly sales, 2026 vs 2025</h3>
-        <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
-        <div class="chart" id="line"></div></div>
-      <div class="card"><h3>Units sold, 2026 vs 2025</h3>
-        <div class="legend"><span><i class="sw-muted"></i>2025</span><span><i class="sw-accent"></i>2026</span></div>
-        <div class="chart" id="bars"></div></div>
-    </section>
+      <!-- Losses -->
+      <section class="view" data-view="losses" hidden>
+        <p class="note lead" id="loss-line"></p>
+        <div class="grid2">
+          <div class="card"><h3>Sold by unit condition</h3><div class="donut" id="cond"></div>
+            <div class="tw"><table id="lc" class="hlt"><thead><tr><th>Condition</th><th>Units sold</th><th>Sold amount</th><th>Total loss</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+          <div class="card"><h3 id="ns-title">Non-starter accounts by division</h3>
+            <div class="tw"><table id="ns"><thead><tr><th>Division</th><th>Units sold</th><th>Sold amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+        </div>
+        <div class="card"><h3>Losses by product type</h3>
+          <div class="tw"><table id="lp" class="hlt"><thead><tr><th>Product type</th><th>Units sold</th><th>Sold amount</th><th>Total loss</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+        <div class="card"><h3>Losses by division</h3>
+          <div class="tw"><table id="ld" class="hlt"><thead><tr><th>Division</th><th>Units sold</th><th>Sold amount</th><th>Total loss</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+        <div class="grid2">
+          <div class="card"><h3>Top 10 loss units, ₱300K and up</h3><p class="note" id="top10-note">Borrower names are left out of this version.</p>
+            <div class="tw"><table id="top10"><thead><tr><th>Unit</th><th>Product type</th><th>Condition</th><th>Net gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div></div>
+          <div class="card"><h3>Top 10 sold by brand / model</h3><p class="note" id="brands-note"></p>
+            <div class="tw"><table id="brands"><thead><tr><th>#</th><th>Brand / model</th><th>Units sold</th><th>Sold amount</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+        <div class="card"><h3>Disposal costs</h3>
+          <div class="tw"><table id="costs"><thead><tr><th>Cost</th><th>Amount (PHP)</th><th>% of sold amount</th><th>Avg per unit sold</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
+      </section>
 
-    <section class="card"><h3>Top 5 sold units by product type, with recovery rate</h3>
-      <p class="note">Recovery rate is sold amount ÷ OPB. Green meets the target, amber is within 10 points, red is below that.</p>
-      <div class="tw"><table id="top5"><thead><tr><th>Product type</th><th>Units sold</th><th>Total amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div>
-    </section>
+      <!-- Inventory -->
+      <section class="view" data-view="inventory" hidden>
+        <div class="kpis" id="inv-kpis"></div>
+        <div class="card"><h3 id="inv-title">Total breakdown inventories</h3>
+          <p class="note">Month-end inventory by status, compared with the month before. For units on hand an increase is red. Redeemed and Sold are outflows, so an increase there is green, and they are left out of the grand total.</p>
+          <div class="tw"><table id="inv"><thead></thead><tbody></tbody></table></div></div>
+      </section>
 
-    <section class="grid3">
-      <div class="card"><h3>Sold by division</h3><div class="donut" id="div"></div></div>
-      <div class="card"><h3>Sold by unit condition</h3><div class="donut" id="cond"></div></div>
-      <div class="card"><h3>Top sales associates</h3><p class="note">Units sold. PINNACLE is left out, as in the workbook.</p><div class="chart small" id="assoc"></div></div>
-    </section>
+      <!-- FMV generator -->
+      <section class="view" data-view="fmv" hidden>
+        <p class="sub fmv-intro">Enter the unit's details to get a fair market value based on what similar units actually sold for in past ROPA sales. <span class="asof" id="fmv-asof">Loading sales history…</span></p>
+        <p class="err" id="fmv-err" hidden></p>
+        <div class="fmv-grid">
+          <form class="card fmv-form" id="fmv-form" novalidate>
+            <h3>Unit details</h3>
+            <div class="fields">
+              <label class="fld"><span class="fl">Brand <span class="req">required</span></span>
+                <select id="f-brand" required><option value="">Choose a brand</option></select></label>
+              <label class="fld"><span class="fl">Model / series <span class="req">required</span></span>
+                <input id="f-series" list="series-list" autocomplete="off" placeholder="Pick a model, e.g. VIOS, or type the full series" required>
+                <datalist id="series-list"></datalist></label>
+              <label class="fld"><span class="fl">Year model <span class="req">required</span></span>
+                <select id="f-year" required><option value="">Choose a year</option></select></label>
+              <label class="fld"><span class="fl">Product type</span>
+                <select id="f-product"><option value="">Any</option></select></label>
+              <label class="fld"><span class="fl">Body type</span>
+                <select id="f-body"><option value="">Any</option></select></label>
+              <label class="fld"><span class="fl">Transmission / fuel</span>
+                <select id="f-trans"><option value="">Any</option></select></label>
+              <label class="fld"><span class="fl">Mileage (km)</span>
+                <input id="f-km" type="number" inputmode="numeric" min="0" step="1000" placeholder="e.g. 85000"></label>
+              <label class="fld"><span class="fl">Condition</span>
+                <select id="f-cond">
+                  <option value="">Not sure</option>
+                  <option>Minor issues</option>
+                  <option>Moderate issues</option>
+                  <option>Major issues</option>
+                </select></label>
+            </div>
+            <p class="err" id="form-err" hidden></p>
+            <div class="actions">
+              <button type="submit" class="btn primary" id="btn-go" disabled>Get fair market value</button>
+              <button type="reset" class="btn ghost">Clear</button>
+            </div>
+          </form>
+          <section class="card fmv-result" id="result" aria-live="polite">
+            <div class="empty" id="result-empty">
+              <h3>Fair market value</h3>
+              <p class="note">Fill in at least the brand, model and year model. The more details you add, the closer the estimate.</p>
+            </div>
+            <div id="result-body" hidden>
+              <div class="lbl">Fair market value</div>
+              <div class="fmv-val" id="r-val"></div>
+              <div class="fmv-range">
+                <div class="bar"><span class="band" id="r-band"></span><span class="dot" id="r-dot"></span></div>
+                <div class="ends"><span id="r-low"></span><span class="mid">Likely selling range</span><span id="r-high"></span></div>
+              </div>
+              <p class="basis"><span class="pill" id="r-conf"></span> <span id="r-basis"></span></p>
+              <ul class="adj" id="r-adj"></ul>
+              <p class="note">An estimate from past ROPA sales, not a formal appraisal. Rounded to the nearest ₱5,000. Actual bids depend on the unit's real condition, documents and demand on the day.</p>
+            </div>
+          </section>
+        </div>
+        <div class="card" id="comps">
+          <div class="comps-head">
+            <h3>Comparable sold units</h3>
+            <button type="button" class="btn ghost" id="btn-more" hidden>Show 5 more</button>
+          </div>
+          <p class="note" id="comps-note">Get a fair market value to see the closest sold units it was based on.</p>
+          <div class="tw" id="comps-wrap" hidden>
+            <table id="comps-table">
+              <thead><tr><th>#</th><th>Unit</th><th>Year</th><th>Body</th><th>Transmission</th><th>Mileage</th><th>Condition</th><th>Sold</th><th class="num">Sold amount</th><th class="num">Adjusted to this unit</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="note" id="comps-foot" hidden>Closest matches first: same brand and model, then nearer year, body type, transmission, condition and more recent sales. "Adjusted to this unit" is the sold amount corrected for differences in year model, mileage, condition and transmission; the fair market value is the middle of these adjusted amounts.</p>
+        </div>
+      </section>
 
-
-    <section class="card"><h3 id="inv-title">Total breakdown inventories</h3>
-      <p class="note">Month-end inventory by status from the INVTY HISTORY sheet, with the latest months from DAILY TOTAL INVTY. It follows the month picker and compares with the month before. For units on hand an increase is red. Redeemed and Sold are outflows, so an increase there is green, and they are left out of the grand total.</p>
-      <div class="tw"><table id="inv"><thead></thead><tbody></tbody></table></div>
-    </section>
-
-    <h2 id="loss-title">ROPA cause of losses</h2>
-    <p class="note lead" id="loss-line"></p>
-    <section class="card"><h3 id="ns-title">Non-starter accounts per division</h3>
-      <div class="tw"><table id="ns"><thead><tr><th>Division</th><th>Units sold</th><th>Sold amount</th><th>Gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div>
-    </section>
-    <section class="grid2">
-      <div class="card"><h3>By unit condition</h3>
-        <div class="tw"><table id="lc"><thead><tr><th>Condition</th><th>Units sold</th><th>Net gain/(loss)</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
-      <div class="card"><h3>Disposal costs</h3>
-        <div class="tw"><table id="costs"><thead><tr><th>Cost</th><th>Amount (PHP)</th><th>% of sold amount</th><th>Avg per unit sold</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div>
-    </section>
-    <section class="card"><h3>By product type</h3>
-      <div class="tw"><table id="lp"><thead><tr><th>Product type</th><th>Units sold</th><th>Net gain/(loss)</th><th>% of net loss</th><th>Recovery rate</th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></section>
-    <section class="card"><h3>Top 10 loss units</h3><p class="note">Borrower names are left out of this version.</p>
-      <div class="tw"><table id="top10"><thead><tr><th>Unit</th><th>Product type</th><th>Condition</th><th>Net gain/(loss)</th><th>Recovery rate</th></tr></thead><tbody></tbody></table></div></section>
-
-    <footer><span>ROPA | Sales performance dashboard · data from ROPA MONITORING.xlsx</span><span>More Sales. More Recovery. Greater Impact.</span></footer>
+      <footer><span>ROPA | Sales performance dashboard · data from ROPA MONITORING.xlsx</span><span>More Sales. More Recovery. Greater Impact.</span></footer>
+    </main>
   </div>
 
   <div class="loading" id="loading" role="status" aria-live="polite">
@@ -85,6 +178,10 @@
 
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="dash-logic.js"></script>
+  <script src="fmv-engine.js"></script>
+  <script src="fmv.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

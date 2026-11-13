@@ -2,103 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ROPA FMV Generator</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
-  <link rel="stylesheet" href="styles.css">
+  <meta http-equiv="refresh" content="0; url=index.html#fmv">
+  <script>location.replace('index.html#fmv');</script>
 </head>
-<body>
-  <div class="loading" id="loading" role="status" aria-live="polite">
-    <div class="ld-bar"><i></i></div>
-    <div class="ld-mid"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#29265F"/><rect x="13" y="34" width="9" height="17" rx="2" fill="#FBCB0A" opacity=".55"/><rect x="27.5" y="25" width="9" height="26" rx="2" fill="#FBCB0A" opacity=".8"/><rect x="42" y="14" width="9" height="37" rx="2" fill="#FBCB0A"/></svg><div class="ld-name">ROPA Department</div><div class="ld-msg">Loading sales history…</div></div>
-  </div>
-  <div class="rp">
-    <header class="rp-head">
-      <div>
-        <nav class="tabs" aria-label="Pages"><a href="./">Dashboard</a><a href="fmv.html" aria-current="page">FMV generator</a></nav>
-        <div class="eyebrow">ROPA · Fair market value</div>
-        <h1>What will this unit sell for?</h1>
-        <p class="sub">Enter the unit's details to get a fair market value based on what similar units actually sold for in our past ROPA sales.</p>
-      </div>
-      <div class="ctls"><span class="asof" id="asof">Loading sales history…</span></div>
-    </header>
-    <p class="err" id="load-err" hidden></p>
-
-    <section class="fmv-grid">
-      <form class="card fmv-form" id="fmv-form" novalidate>
-        <h3>Unit details</h3>
-        <div class="fields">
-          <label class="fld"><span class="fl">Brand <span class="req">required</span></span>
-            <select id="f-brand" required><option value="">Choose a brand</option></select></label>
-          <label class="fld"><span class="fl">Model / series <span class="req">required</span></span>
-            <input id="f-series" list="series-list" autocomplete="off" placeholder="Pick a model, e.g. VIOS, or type the full series" required>
-            <datalist id="series-list"></datalist></label>
-          <label class="fld"><span class="fl">Year model <span class="req">required</span></span>
-            <select id="f-year" required><option value="">Choose a year</option></select></label>
-          <label class="fld"><span class="fl">Product type</span>
-            <select id="f-product"><option value="">Any</option></select></label>
-          <label class="fld"><span class="fl">Body type</span>
-            <select id="f-body"><option value="">Any</option></select></label>
-          <label class="fld"><span class="fl">Transmission / fuel</span>
-            <select id="f-trans"><option value="">Any</option></select></label>
-          <label class="fld"><span class="fl">Mileage (km)</span>
-            <input id="f-km" type="number" inputmode="numeric" min="0" step="1000" placeholder="e.g. 85000"></label>
-          <label class="fld"><span class="fl">Condition</span>
-            <select id="f-cond">
-              <option value="">Not sure</option>
-              <option>Minor issues</option>
-              <option>Moderate issues</option>
-              <option>Major issues</option>
-            </select></label>
-        </div>
-        <p class="err" id="form-err" hidden></p>
-        <div class="actions">
-          <button type="submit" class="btn primary" id="btn-go" disabled>Get fair market value</button>
-          <button type="reset" class="btn ghost">Clear</button>
-        </div>
-      </form>
-
-      <section class="card fmv-result" id="result" aria-live="polite">
-        <div class="empty" id="result-empty">
-          <h3>Fair market value</h3>
-          <p class="note">Fill in at least the brand, model and year model. The more details you add, the closer the estimate.</p>
-        </div>
-        <div id="result-body" hidden>
-          <div class="lbl">Fair market value</div>
-          <div class="fmv-val" id="r-val"></div>
-          <div class="fmv-range">
-            <div class="bar"><span class="band" id="r-band"></span><span class="dot" id="r-dot"></span></div>
-            <div class="ends"><span id="r-low"></span><span class="mid">Likely selling range</span><span id="r-high"></span></div>
-          </div>
-          <p class="basis"><span class="pill" id="r-conf"></span> <span id="r-basis"></span></p>
-          <ul class="adj" id="r-adj"></ul>
-          <p class="note">An estimate from past ROPA sales, not a formal appraisal. Rounded to the nearest ₱5,000. Actual bids depend on the unit's real condition, documents and demand on the day.</p>
-        </div>
-      </section>
-    </section>
-
-    <section class="card" id="comps">
-      <div class="comps-head">
-        <h3>Comparable sold units</h3>
-        <button type="button" class="btn ghost" id="btn-more" hidden>Show 5 more</button>
-      </div>
-      <p class="note" id="comps-note">Get a fair market value to see the closest sold units it was based on.</p>
-      <div class="tw" id="comps-wrap" hidden>
-        <table id="comps-table">
-          <thead><tr><th>#</th><th>Unit</th><th>Year</th><th>Body</th><th>Transmission</th><th>Mileage</th><th>Condition</th><th>Sold</th><th class="num">Sold amount</th><th class="num">Adjusted to this unit</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p class="note" id="comps-foot" hidden>Closest matches first: same brand and model, then nearer year, body type, transmission, condition and more recent sales. "Adjusted to this unit" is the sold amount corrected for differences in year model, mileage, condition and transmission; the fair market value is the middle of these adjusted amounts.</p>
-    </section>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="config.js"></script>
-  <script src="fmv-engine.js"></script>
-  <script src="fmv.js"></script>
-</body>
+<body><p>The FMV generator is now part of the dashboard. <a href="index.html#fmv">Open the FMV generator</a>.</p></body>
 </html>
