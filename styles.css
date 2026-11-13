@@ -203,3 +203,14 @@ table.hlt th:nth-child(n+2):nth-child(-n+5) { color: var(--fg); font-weight: 600
 @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
 #brands th:first-child, #brands td:first-child { min-width: 0; width: 2.5rem; color: var(--muted); }
 #brands th:nth-child(2), #brands td:nth-child(2) { text-align: left; white-space: normal; }
+/* FMV market reference (market-prices.xlsx) */
+.mkt { border-top: 3px solid var(--c3); }
+.mkt-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.mkt-t { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: 13px; }
+.mkt-t span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.mkt .bar { position: relative; height: 10px; border-radius: 999px; background: var(--grid); margin-top: 6px; }
+.mkt .bar i { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+.mkt .bar i.repo { background: var(--c3); }
+.mkt .bar i.used { background: var(--chart-muted); }
+.mkt .bar .dot { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--gold); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--gold-deep); }
+.mkt-gap { margin: 6px 0 0; padding: 10px 12px; border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--gold) 10%, transparent); border-radius: 0 8px 8px 0; font-size: 14px; }
