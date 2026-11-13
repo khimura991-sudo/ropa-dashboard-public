@@ -153,7 +153,7 @@
       svg.append('rect').attr('x', lx).attr('y', yy - 12).attr('width', 10).attr('height', 10).attr('rx', 2).attr('fill', P[i % P.length]);
       const nm = svg.append('text').attr('x', lx + 16).attr('y', yy - 3).style('font-size', '12px').attr('fill', 'var(--muted)').text(d.name);
       let s = d.name; while (nm.node().getComputedTextLength() > avail - 16 && s.length > 4) { s = s.slice(0, -2); nm.text(s + '…'); }
-      svg.append('text').attr('x', lx + 16).attr('y', yy + 13).style('font-size', '12px').style('font-weight', 600).attr('fill', 'var(--fg)').text(int(d.units) + ' · ' + pct(d.units / total));
+      svg.append('text').attr('x', lx + 16).attr('y', yy + 13).style('font-size', '12px').style('font-weight', 600).attr('fill', 'var(--fg)').text(int(d.units) + ' · ' + pct(d.units / total) + (d.extra ? ' · ' + d.extra : ''));
     });
   }
 
@@ -190,25 +190,41 @@
   function kpiCard(label, value, deltas) { const c = el('div', 'card kpi'); c.append(el('div', 'lbl', label), el('div', 'val', value)); const dl = el('div', 'dl'); deltas.forEach((d) => dl.appendChild(d)); c.appendChild(dl); return c; }
   const groupSum = (rs, key) => Array.from(d3.group(rs, (r) => r[key] || 'UNCLASSIFIED'), ([name, xs]) => ({ name, ...tot(xs), xs }));
 
-  function setupMonths() {
-    const months = Array.from(new Set(D.sold.map((r) => r.month))).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-    const sel = $('month');
-    const keep = month;
-    sel.replaceChildren(...months.map((m) => new Option(m, m)));
-    month = months.includes(keep) ? keep : months.includes(D.default_month) ? D.default_month : months[months.length - 1];
-    sel.value = month || '';
+  // ---------------------------------------------------------------- menus + month buttons
+  const VIEWS = ['overview', 'sales', 'losses', 'inventory', 'fmv'];
+  let view = 'overview', SALES = null, SALES_ERR = null;
+  function showView() {
+    const v = (location.hash || '').replace('#', '');
+    view = VIEWS.includes(v) ? v : 'overview';
+    document.querySelectorAll('.view').forEach((s) => { s.hidden = s.dataset.view !== view; });
+    document.querySelectorAll('#nav a').forEach((a) => { if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    $('months').hidden = view === 'fmv'; $('takeaway').hidden = view === 'fmv';
+    if (view === 'fmv') $('view-title').textContent = 'FMV generator';
+    render();
   }
 
+  function setupMonths() {
+    const months = Array.from(new Set(D.sold.map((r) => r.month))).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+    const keep = month;
+    month = months.includes(keep) ? keep : months.includes(D.default_month) ? D.default_month : months[months.length - 1];
+    $('months').replaceChildren(...months.map((m) => {
+      const b = el('button', '', MS[MONTHS.indexOf(m)] + ' ' + dataYear()); b.type = 'button'; b.dataset.m = m;
+      b.setAttribute('aria-pressed', String(m === month));
+      b.addEventListener('click', () => { month = m; $('months').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === m))); render(); });
+      return b;
+    }));
+    const on = $('months').querySelector('[aria-pressed="true"]'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  const dataYear = () => { const y = D && new Date(D.generated_at).getFullYear(); return y && !isNaN(y) ? y : new Date().getFullYear(); };
+
   function render() {
-    if (!D || !month) return;
+    if (!D || !month || view === 'fmv') return;
     const byMonth = d3.group(D.sold, (r) => r.month);
     const ovT = (i, y) => { const m = D.monthly.find((x) => x.month_num === i + 1); return m && m['sales_' + y] != null ? { u: m['units_' + y], s: m['sales_' + y], g: m['gain_' + y], rec: m['sales_' + y] / (m['sales_' + y] - m['gain_' + y]) } : null; };
     const rs = byMonth.get(month) || [], i = MONTHS.indexOf(month), pi = (i + 11) % 12;
     const c = tot(rs), p = byMonth.has(MONTHS[pi]) ? tot(byMonth.get(MONTHS[pi])) : ovT(pi, i === 0 ? '2025' : '2026'), ly = ovT(i, '2025');
     const lossUnits = rs.filter((r) => r.gain < 0).length;
     const T = C.recoveryTarget, IT = C.inventoryTarget, lm = 'vs ' + MONTHS[pi];
-
-    $('title').textContent = month + ' sales overview';
     const tk = $('takeaway'); tk.replaceChildren();
     tk.append('Sold ', el('b', '', int(c.u)), ' units for ', el('b', '', peso(c.s)), ' at a recovery rate of ', el('b', '', pct(c.rec)), ` against the ${pct(T).replace('.0', '')} target. `, el('b', '', int(lossUnits)), ' of those units sold at a loss.');
 
@@ -220,50 +236,126 @@
     const isLater = !!invMonth && invMonth !== month;
     const invPrevMonth = invMonth && MONTHS.indexOf(invMonth) > 0 ? MONTHS[MONTHS.indexOf(invMonth) - 1] : null;
     const invCur = invMonth ? invTot(H[invMonth]) : null, invPrev = invPrevMonth && H[invPrevMonth] ? invTot(H[invPrevMonth]) : null;
-    const ptsSpan = (() => { const s = el('span'); const d = c.rec != null && p && p.rec != null ? (c.rec - p.rec) * 100 : null;
-      if (d == null) { s.textContent = '— pts ' + lm; return s; } s.className = Math.abs(d) < 1e-9 ? 'flat' : d > 0 ? 'good' : 'bad'; s.textContent = (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '● ') + Math.abs(d).toFixed(1) + ' pts ' + lm; return s; })();
-    $('kpis').replaceChildren(
-      kpiCard('Total sales', peso(c.s), [delta(chg(c.s, p && p.s), true, lm), delta(chg(c.s, ly && ly.s), true, 'vs same month 2025')]),
-      kpiCard('Total units sold', int(c.u), [delta(chg(c.u, p && p.u), true, lm), delta(chg(c.u, ly && ly.u), true, 'vs same month 2025')]),
-      kpiCard('Recovery rate', pct(c.rec), [delta(c.rec == null ? null : (c.rec - T) / T, true, `vs ${pct(T).replace('.0', '')} target`), ptsSpan]),
-      kpiCard('Total gain / (loss)', peso(c.g), [delta(lchg(c.g, p && p.g), false, 'loss ' + lm), delta(lchg(c.g, ly && ly.g), false, 'loss vs same month 2025')]),
-      kpiCard(isLater ? `Total inventory (${invMonth})` : 'Total inventory', invCur ? int(invCur.u) : '—', !invCur ? [el('span', '', 'No inventory snapshot for this month')] :
-        [...(isLater ? [el('span', 'flat', `Latest snapshot: ${invMonth}. ${month} not in the inventory sheets yet`)] : []),
-         ...(invPrev ? [delta(chg(invCur.u, invPrev.u), false, 'vs ' + invPrevMonth)] : []), delta((invCur.u - IT) / IT, false, `vs ${IT} target`)]),
-    );
-
-    drawMonthly($('line'), D.monthly, 'sales', 'line', i);
-    drawMonthly($('bars'), D.monthly, 'units', 'bar', i);
-
     const recCell = [(r) => pct(r.rec), (r) => 'pill ' + recClass(r.rec)];
     const prod = groupSum(rs, 'product_type').sort((a, b) => b.u - a.u).map((r) => ({ ...r, share: c.g ? r.g / c.g : 0, rec: r.opb ? r.s / r.opb : 0 }));
-    fill('top5', prod.slice(0, 5), [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.s)], [(r) => pesoFull(r.g)], recCell]);
 
-    drawDonut($('div'), groupSum(rs, 'division').sort((a, b) => b.u - a.u).map((r) => ({ name: r.name, units: r.u })));
-    drawDonut($('cond'), groupSum(rs, 'condition').sort((a, b) => b.u - a.u).map((r) => ({ name: r.name, units: r.u })));
-    drawAssoc($('assoc'), (D.assoc ? D.assoc.filter((r) => r.month === month && r.name !== 'PINNACLE').map((r) => ({ name: r.name, units: r.units }))
-      : groupSum(rs.filter((r) => r.associate && r.associate !== 'PINNACLE'), 'associate').map((r) => ({ name: r.name, units: r.u })))
-      .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name)).slice(0, 5));
+    if (view === 'overview') {
+      $('view-title').textContent = month + ' sales overview';
+      const ptsSpan = (() => { const s = el('span'); const d = c.rec != null && p && p.rec != null ? (c.rec - p.rec) * 100 : null;
+        if (d == null) { s.textContent = '— pts ' + lm; return s; } s.className = Math.abs(d) < 1e-9 ? 'flat' : d > 0 ? 'good' : 'bad'; s.textContent = (d > 0 ? '▲ ' : d < 0 ? '▼ ' : '● ') + Math.abs(d).toFixed(1) + ' pts ' + lm; return s; })();
+      $('kpis').replaceChildren(
+        kpiCard('Total sales', peso(c.s), [delta(chg(c.s, p && p.s), true, lm), delta(chg(c.s, ly && ly.s), true, 'vs same month 2025')]),
+        kpiCard('Total units sold', int(c.u), [delta(chg(c.u, p && p.u), true, lm), delta(chg(c.u, ly && ly.u), true, 'vs same month 2025')]),
+        kpiCard('Recovery rate', pct(c.rec), [ptsSpan, delta(c.rec == null ? null : (c.rec - T) / T, true, `vs ${pct(T).replace('.0', '')} target`)]),
+        kpiCard('Total gain / (loss)', peso(c.g), [delta(lchg(c.g, p && p.g), false, 'loss ' + lm), delta(lchg(c.g, ly && ly.g), false, 'loss vs same month 2025')]),
+        kpiCard(isLater ? `Total inventory (${invMonth})` : 'Total inventory', invCur ? int(invCur.u) : '—', !invCur ? [el('span', '', 'No inventory snapshot for this month')] :
+          [...(isLater ? [el('span', 'flat', `Latest snapshot: ${invMonth}. ${month} not in the inventory sheets yet`)] : []),
+           ...(invPrev ? [delta(chg(invCur.u, invPrev.u), false, 'vs ' + invPrevMonth)] : []), delta((invCur.u - IT) / IT, false, `vs ${IT} target`)]),
+      );
+      drawMonthly($('line'), D.monthly, 'sales', 'line', i);
+      drawMonthly($('bars'), D.monthly, 'units', 'bar', i);
+      fill('top5', prod.slice(0, 5), [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.s)], [(r) => pesoFull(r.g)], recCell]);
+      drawDonut($('div'), groupSum(rs, 'division').sort((a, b) => b.u - a.u).map((r) => ({ name: r.name, units: r.u })));
+    }
 
-    $('ns-title').textContent = 'Non-starter accounts per division · ' + month;
-    const nsRows = groupSum(rs, 'division').map((r) => ({ name: r.name, ...tot(r.xs.filter((x) => x.non_starter)) })).sort((a, b) => b.u - a.u);
-    const nsT = tot(rs.filter((x) => x.non_starter));
-    fill('ns', nsRows, [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.s)], [(r) => pesoFull(r.g)], [(r) => (r.u ? pct(r.rec) : '-'), (r) => (r.u ? 'pill ' + recClass(r.rec) : null)]],
-      ['Total', int(nsT.u), pesoFull(nsT.s), pesoFull(nsT.g), pct(nsT.rec)]);
+    if (view === 'sales') {
+      $('view-title').textContent = month + ' sales';
+      $('sales-kpis').replaceChildren(...[1, 2, 3].map(() => { const k = kpiCard('KPI', '—', [el('span', 'flat', 'To be added')]); k.classList.add('placeholder'); return k; }));
+      drawAssoc($('assoc'), (D.assoc ? D.assoc.filter((r) => r.month === month && r.name !== 'PINNACLE').map((r) => ({ name: r.name, units: r.units }))
+        : groupSum(rs.filter((r) => r.associate && r.associate !== 'PINNACLE'), 'associate').map((r) => ({ name: r.name, units: r.u })))
+        .sort((a, b) => b.units - a.units || a.name.localeCompare(b.name)));
+      drawCalendar(i);
+    }
 
-    $('loss-title').textContent = 'ROPA cause of losses · ' + month;
-    $('loss-line').textContent = `Units sold at a loss: ${int(lossUnits)} of ${int(c.u)}. Net loss: ${pesoFull(c.g)}.`;
-    const order = { 'MINOR ISSUES': 1, 'MODERATE ISSUES': 2, 'MAJOR ISSUES': 3 };
-    const cond = groupSum(rs, 'condition').map((r) => ({ ...r, share: c.g ? r.g / c.g : 0, rec: r.opb ? r.s / r.opb : 0 })).sort((a, b) => (order[a.name] || 9) - (order[b.name] || 9));
-    const foot = ['Total', int(c.u), pesoFull(c.g), '100.0%', pct(c.rec)];
-    fill('lc', cond, [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.g)], [(r) => pct(r.share)], recCell], foot);
-    fill('lp', prod, [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.g)], [(r) => pct(r.share)], recCell], foot);
-    const fees = [['Storage fee', 'storage_fee'], ['Notarial fee', 'notarial_fee'], ['Towing fee', 'towing_fee'], ['Legal fee', 'legal_fee'], ['Commissions', 'commissions'], ['Repair fee', 'repair_fee']];
-    const costRows = fees.map(([name, f]) => ({ name, a: d3.sum(rs, (r) => r[f]) })), ct = d3.sum(costRows, (r) => r.a);
-    fill('costs', costRows, [[(r) => r.name], [(r) => pesoFull(r.a)], [(r) => pct(c.s ? r.a / c.s : 0)], [(r) => pesoFull(c.u ? r.a / c.u : 0)]], ['Total', pesoFull(ct), pct(c.s ? ct / c.s : 0), pesoFull(c.u ? ct / c.u : 0)]);
-    fill('top10', (D.top ? D.top.filter((r) => r.month === month) : rs.slice()).sort((a, b) => a.gain - b.gain).slice(0, 10), [[(r) => r.unit], [(r) => r.product_type], [(r) => r.condition], [(r) => pesoFull(r.gain), () => 'bad'], [(r) => pct(r.recovery), (r) => 'pill ' + recClass(r.recovery)]]);
+    if (view === 'losses') {
+      $('view-title').textContent = 'ROPA cause of losses · ' + month;
+      $('loss-line').textContent = `Units sold at a loss: ${int(lossUnits)} of ${int(c.u)}. Net loss: ${pesoFull(c.g)}. Total loss is the net gain/(loss); % of net loss is each group's share of it.`;
+      const order = { 'MINOR ISSUES': 1, 'MODERATE ISSUES': 2, 'MAJOR ISSUES': 3 };
+      const share = (r) => ({ ...r, share: c.g ? r.g / c.g : 0, rec: r.opb ? r.s / r.opb : 0 });
+      const cond = groupSum(rs, 'condition').map(share).sort((a, b) => (order[a.name] || 9) - (order[b.name] || 9) || b.u - a.u);
+      drawDonut($('cond'), cond.map((r) => ({ name: r.name, units: r.u, extra: peso(r.g) })));
+      const lossCells = [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.s)], [(r) => pesoFull(r.g), (r) => (r.g < 0 ? 'bad' : null)], [(r) => pct(r.share)], recCell];
+      const foot = ['Total', int(c.u), pesoFull(c.s), pesoFull(c.g), '100.0%', pct(c.rec)];
+      fill('lc', cond, lossCells, foot);
+      fill('lp', prod, lossCells, foot);
+      fill('ld', groupSum(rs, 'division').map(share).sort((a, b) => a.g - b.g), lossCells, foot);
 
-    // Inventory breakdown: picked month vs the month before
+      $('ns-title').textContent = 'Non-starter accounts by division · ' + month;
+      const nsRows = groupSum(rs, 'division').map((r) => ({ name: r.name, ...tot(r.xs.filter((x) => x.non_starter)) })).sort((a, b) => b.u - a.u);
+      const nsT = tot(rs.filter((x) => x.non_starter));
+      fill('ns', nsRows, [[(r) => r.name], [(r) => int(r.u)], [(r) => pesoFull(r.s)], [(r) => pesoFull(r.g)], [(r) => (r.u ? pct(r.rec) : '-'), (r) => (r.u ? 'pill ' + recClass(r.rec) : null)]],
+        ['Total', int(nsT.u), pesoFull(nsT.s), pesoFull(nsT.g), pct(nsT.rec)]);
+
+      const big = D.top ? DASH.bigLosses(D.top, month) : DASH.bigLosses(rs.map((r) => ({ ...r, unit: r.unit || r.product_type, recovery: r.opb ? r.sold_amount / r.opb : null })), month);
+      fill('top10', big, [[(r) => r.unit], [(r) => r.product_type], [(r) => r.condition], [(r) => pesoFull(r.gain), () => 'bad'], [(r) => pct(r.recovery), (r) => 'pill ' + recClass(r.recovery)]]);
+      $('top10-note').textContent = (big.length ? `${big.length} unit${big.length === 1 ? '' : 's'} lost ₱300K or more in ${month}.` : `No units lost ₱300K or more in ${month}.`) + ' Borrower names are left out of this version.';
+      drawBrands(i);
+
+      const fees = [['Storage fee', 'storage_fee'], ['Notarial fee', 'notarial_fee'], ['Towing fee', 'towing_fee'], ['Legal fee', 'legal_fee'], ['Commissions', 'commissions'], ['Repair fee', 'repair_fee']];
+      const costRows = fees.map(([name, f]) => ({ name, a: d3.sum(rs, (r) => r[f]) })), ct = d3.sum(costRows, (r) => r.a);
+      fill('costs', costRows, [[(r) => r.name], [(r) => pesoFull(r.a)], [(r) => pct(c.s ? r.a / c.s : 0)], [(r) => pesoFull(c.u ? r.a / c.u : 0)]], ['Total', pesoFull(ct), pct(c.s ? ct / c.s : 0), pesoFull(c.u ? ct / c.u : 0)]);
+    }
+
+    if (view === 'inventory') {
+      $('view-title').textContent = 'Inventory · ' + (invMonth || month);
+      const kc = invMonth ? DASH.invKpis(H[invMonth]) : null, kp = invPrevMonth && H[invPrevMonth] ? DASH.invKpis(H[invPrevMonth]) : null;
+      const vsPrev = (f) => (kp ? [delta(chg(kc[f], kp[f]), false, 'vs ' + invPrevMonth)] : [el('span', 'flat', 'No snapshot for the month before')]);
+      const later = isLater ? [el('span', 'flat', `Latest snapshot: ${invMonth}`)] : [];
+      $('inv-kpis').replaceChildren(...(!kc ? [kpiCard('On-hand inventory', '—', [el('span', '', 'No inventory snapshot for this month')])] : [
+        kpiCard('On-hand inventory', int(kc.onHand), [...later, ...vsPrev('onHand'), delta((kc.onHand - IT) / IT, false, `vs ${IT} target`)]),
+        kpiCard('Under legal', int(kc.underLegal), [...later, ...vsPrev('underLegal')]),
+        kpiCard('For sale', int(kc.forSale), [...later, ...vsPrev('forSale')]),
+      ]));
+      renderInventory(H, invMonth, invPrevMonth, invCur, invPrev, outflow);
+    }
+  }
+
+  // Sold per day: workdays of the picked month from the sales file (fmv-data.xlsx)
+  function drawCalendar(i) {
+    const box = $('cal'), note = $('cal-note'), sum = $('cal-sum');
+    sum.replaceChildren();
+    if (SALES_ERR) { box.replaceChildren(); note.textContent = 'The sales file could not be read: ' + SALES_ERR; return; }
+    if (!SALES) { box.replaceChildren(); note.textContent = 'Loading the sales file…'; return; }
+    const year = dataYear(), days = SALES.days || [];
+    const inMonth = days.filter((d) => d.startsWith(`${year}-${String(i + 1).padStart(2, '0')}-`));
+    if (!inMonth.length) { box.replaceChildren(); note.textContent = 'No daily data for this month in the sales file.'; return; }
+    // "So far" ends at the last day in the sales file, so days the file doesn't cover yet don't count as zero
+    const lastDay = days.reduce((a, b) => (b > a ? b : a), ''), now = new Date(), lastD = new Date(lastDay + 'T00:00:00');
+    const upTo = lastD < now ? lastD : now, cal = DASH.workdayCalendar(inMonth, year, i, upTo), todayIso = DASH.dayOf(upTo);
+    note.textContent = `From the sales file (fmv-data.xlsx), data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}. ` +
+      (cal.weekendUnits ? `${int(cal.weekendUnits)} weekend unit${cal.weekendUnits === 1 ? ' is' : 's are'} added to the Friday before. ` : '') +
+      'Gold days are at or above the daily average. The count can differ slightly from Total units sold, which comes from the Google Sheet.';
+    const kids = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((w) => el('div', 'wd', w));
+    cal.weeks.forEach((w) => w.forEach((x) => {
+      if (!x) { kids.push(el('div', 'day blank')); return; }
+      const fut = x.date > todayIso, cls = ['day'];
+      if (fut) cls.push('future'); else if (!x.units) cls.push('zero'); else if (x.units >= cal.average) cls.push('hi');
+      if (x.date === todayIso) cls.push('today'); // last day with data
+      const cell = el('div', cls.join(' '));
+      cell.title = `${MS[i]} ${x.d}: ${int(x.units)} units` + (x.weekend ? ` (incl. ${x.weekend} from the weekend)` : '');
+      cell.append(el('span', 'd', String(x.d)), el('span', 'n', fut ? '' : int(x.units)), el('span', 'w', x.weekend ? `+${x.weekend} wknd` : ''));
+      kids.push(cell);
+    }));
+    [[int(cal.total), 'units sold'], [cal.average.toFixed(1), 'average per workday'], [int(cal.workdaysSoFar), 'workdays' + (cal.workdaysSoFar < cal.weeks.flat().filter(Boolean).length ? ' so far' : '')]]
+      .forEach(([v, l]) => { const s = el('span'); s.append(el('b', '', v), l); sum.appendChild(s); });
+    box.replaceChildren(...kids);
+  }
+
+  // Top 10 brand / model by units sold in the picked month, from the sales file
+  const titleCase = (s) => s.split(' ').map((w) => (/^(BYD|GAC|JAC|JMC|MG|DFSK|BMW|MAN|NV350|CX-\d|BT-50|MU-X|D-MAX|CR-V|BR-V|HR-V|G4|L300|H-100)$/.test(w) || /\d/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())).join(' ');
+  function drawBrands(i) {
+    const note = $('brands-note'), tb = document.querySelector('#brands tbody');
+    if (SALES_ERR) { tb.replaceChildren(); note.textContent = 'The sales file could not be read: ' + SALES_ERR; return; }
+    if (!SALES) { tb.replaceChildren(); note.textContent = 'Loading the sales file…'; return; }
+    const rows = DASH.topBrandModels(SALES.units, dataYear(), i, window.FMV);
+    const lastDay = (SALES.days || []).reduce((a, b) => (b > a ? b : a), '');
+    const through = lastDay ? ` Data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}.` : '';
+    note.textContent = (rows.length ? 'Ranked by units sold, from the sales file (fmv-data.xlsx). Loss per brand isn\'t in the data yet.' : 'No daily data for this month in the sales file.') + through;
+    fill('brands', rows.map((r, k) => ({ ...r, k: k + 1 })), [[(r) => String(r.k)], [(r) => titleCase(r.name)], [(r) => int(r.units)], [(r) => pesoFull(r.amount)]]);
+  }
+
+  // Inventory breakdown: picked month vs the month before
+  function renderInventory(H, invMonth, invPrevMonth, invCur, invPrev, outflow) {
     const pmName = invPrevMonth || 'previous month';
     $('inv-title').textContent = 'Total breakdown inventories · ' + (!invMonth ? month + ' (no snapshot)' : invPrev ? `${invPrevMonth} vs ${invMonth}` : invMonth);
     const ih = el('tr'); ['Status', `Units (${invMonth || month})`, `Units vs ${pmName}`, `OPB (${invMonth || month})`, `OPB vs ${pmName}`].forEach((h) => ih.appendChild(el('th', '', h)));
@@ -294,7 +386,7 @@
     const btn = $('btn-refresh'); btn.disabled = true; btn.textContent = 'Refreshing…';
     try {
       D = await loadData();
-      setupMonths(); render();
+      setupMonths(); showView();
       $('load-err').hidden = true;
       $('asof').textContent = 'Data as of ' + new Date(D.generated_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     } catch (e) {
@@ -304,8 +396,12 @@
   }
 
   async function start() {
-    $('month').addEventListener('change', (e) => { month = e.target.value; render(); });
     $('btn-refresh').addEventListener('click', refresh);
+    window.addEventListener('hashchange', showView);
+    showView();
+    $('live-txt').textContent = C.autoRefreshMinutes > 0 ? `Live · updates every ${C.autoRefreshMinutes} min` : 'Updates when you press Refresh';
+    if (window.ROPA_SALES) window.ROPA_SALES.then((f) => { SALES = f; render(); }, (e) => { SALES_ERR = e && e.message ? e.message : String(e); render(); });
+    else SALES_ERR = 'the sales history script did not load.';
     let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150); });
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
     $('app').hidden = false;

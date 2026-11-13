@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROPA Dashboard Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<style>
+:root{--navy:#29265F;--navy-d:#1B1940;--navy-dd:#11102A;--gold:#FBCB0A;--gold-d:#B98A00;--bg:#F5F5FA;--panel:#fff;--fg:#1B1940;--muted:#5B5A77;--line:#E2E1EC;--grid:#ECEBF4;--ok:#1D7A43;--bad:#B3261E;--warn:#A86A00;--cm:#CFCDE3;
+--display:"Newsreader",Georgia,serif;--body:"Instrument Sans",system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:#E9E8F1;color:var(--fg);font:14px/1.45 var(--body)}
+.top{position:sticky;top:0;z-index:20;background:var(--navy-dd);color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.top b{font-weight:600}.top small{color:#B9B7DA}
+.pick{display:flex;gap:6px;flex-wrap:wrap}
+.pick button{font:inherit;font-weight:600;border:1px solid #4A4790;background:transparent;color:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}
+.pick button[aria-selected=true]{background:var(--gold);color:var(--navy-d);border-color:var(--gold)}
+.intro{max-width:1240px;margin:16px auto 0;padding:0 16px}
+.intro h2{margin:0;font:500 24px var(--display)}.intro p{margin:4px 0 0;color:var(--muted);max-width:80ch}
+.intro ul{margin:8px 0 0;padding-left:18px;color:var(--fg)}
+.frame{max-width:1240px;margin:14px auto 40px;padding:0 16px}
+.stage{border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(27,25,64,.18)}
+.opt{display:none}.opt.on{display:block}
+.num{font-variant-numeric:tabular-nums}
+.good{color:var(--ok)}.bad{color:var(--bad)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-weight:600;font-size:12px}
+.pill.good{background:#1D7A4322}.pill.warn{color:var(--warn);background:#A86A0022}.pill.bad{background:#B3261E22}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-weight:500;color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px;white-space:nowrap}
+td{text-align:right;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.tw{overflow-x:auto}
+svg text{font-family:var(--body)}
+.fade{opacity:0;transform:translateY(12px);transition:opacity .6s ease,transform .6s ease}.fade.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.fade{opacity:1;transform:none;transition:none}}
+
+/* ---------- A: Command Center (dark, sidebar) ---------- */
+#A{background:var(--navy-dd);color:#ECEBF5;--line:#2F2C5E;--muted:#A9A7C9;--grid:#26244F;--ok:#5CC88A;--bad:#F2726A;--warn:#E2A93B;--cm:#3B3870}
+.a-wrap{display:grid;grid-template-columns:200px 1fr;min-height:720px}
+.a-side{background:#0B0A1F;padding:18px 12px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--line)}
+.a-logo{display:flex;align-items:center;gap:8px;font-weight:700;margin:0 6px 16px}
+.a-logo i{width:26px;height:26px;border-radius:7px;background:var(--navy);display:grid;place-items:center;color:var(--gold);font-style:normal;font-size:13px}
+.a-side a{color:#A9A7C9;text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;display:flex;justify-content:space-between}
+.a-side a.on{background:#1B1940;color:#fff;box-shadow:inset 3px 0 0 var(--gold)}
+.a-side a span{font-size:11px;background:#B3261E;color:#fff;border-radius:999px;padding:0 6px}
+.a-main{padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.a-bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+.a-bar h1{margin:0;font:500 26px var(--display)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.live i{width:8px;height:8px;border-radius:50%;background:#5CC88A;box-shadow:0 0 0 0 #5CC88A88;animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px #5CC88A00}100%{box-shadow:0 0 0 0 #5CC88A00}}
+.months{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px}
+.months button{font:inherit;font-size:12px;background:#1B1940;border:1px solid var(--line);color:#A9A7C9;border-radius:8px;padding:6px 10px;cursor:pointer;flex:none}
+.months button.on{background:var(--gold);color:var(--navy-d);border-color:var(--gold);font-weight:600}
+.a-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.a-k{background:#1B1940;border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;overflow:hidden}
+.a-k .l{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.a-k .v{font:500 30px/1.1 var(--display);margin:4px 0}
+.a-k .d{font-size:12px}
+.a-k svg{position:absolute;right:10px;bottom:10px;opacity:.9}
+.a-grid{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.a-card{background:#1B1940;border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.a-card h3{margin:0 0 8px;font-size:13px;font-weight:600}
+.a-card .hint{font-size:11px;color:var(--muted);margin:-4px 0 8px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:#B3261E22;border:1px solid #B3261E55;font-size:13px}
+.alert b{color:#F2726A}
+.feed{display:flex;flex-direction:column;gap:8px;font-size:12px}
+.feed div{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.a-pane{display:none}.a-pane.on{display:flex;flex-direction:column;gap:14px;animation:aIn .35s ease}
+@keyframes aIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.a-in{display:block;width:100%;margin-top:4px;font:inherit;font-size:14px;background:#11102A;color:#fff;border:1px solid var(--line);border-radius:8px;padding:8px}
+@media (max-width:820px){.a-wrap{grid-template-columns:1fr}.a-side{flex-direction:row;overflow-x:auto;padding:10px}.a-logo{display:none}.a-side a{flex:none}.a-grid{grid-template-columns:1fr}}
+
+/* ---------- B: Executive Story (light, scroll) ---------- */
+#B{background:var(--bg)}
+.b-hero{background:linear-gradient(160deg,var(--navy) 0%,var(--navy-d) 100%);color:#fff;padding:28px 24px 0;position:relative}
+.b-hero .eb{color:var(--gold);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.b-hero h1{font:400 clamp(26px,4vw,40px)/1.15 var(--display);margin:6px 0 0;max-width:22ch}
+.b-hero h1 em{font-style:normal;color:var(--gold)}
+.b-scrub{margin-top:22px;background:#ffffff12;border-radius:12px 12px 0 0;padding:14px 16px 10px}
+.b-scrub label{font-size:12px;color:#C9C7E6;display:flex;justify-content:space-between}
+.b-scrub input{width:100%;accent-color:var(--gold);margin:8px 0 2px}
+.b-ticks{display:flex;justify-content:space-between;font-size:11px;color:#9D9BC4}
+.b-body{padding:22px 24px 30px;display:flex;flex-direction:column;gap:26px}
+.b-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:22px}
+.b-big .v{font:400 44px/1 var(--display)}.b-big .l{font-size:13px;color:var(--muted);margin-top:6px}
+.b-big .d{font-size:13px;margin-top:4px}
+.b-sec{display:grid;grid-template-columns:260px 1fr;gap:22px;align-items:start;border-top:1px solid var(--line);padding-top:22px}
+.b-sec h2{font:400 22px/1.2 var(--display);margin:0}
+.b-sec p{color:var(--muted);margin:8px 0 0}
+.b-sec .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.b-insight{display:flex;gap:10px;padding:12px 14px;border-left:3px solid var(--gold);background:#FBCB0A14;border-radius:0 8px 8px 0;font-size:13px}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bars .r{display:grid;grid-template-columns:120px 1fr 60px;gap:10px;align-items:center;font-size:13px}
+.bars .t{height:10px;background:var(--grid);border-radius:999px;overflow:hidden}
+.bars .t i{display:block;height:100%;background:var(--navy);border-radius:999px;width:0;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+@media (max-width:760px){.b-sec{grid-template-columns:1fr}}
+
+/* ---------- C: Analyst Workspace (tabs, filters, drawer) ---------- */
+#C{background:var(--bg);position:relative;overflow:hidden}
+.c-head{background:var(--navy);color:#fff;padding:16px 20px 0;border-bottom:4px solid var(--gold)}
+.c-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center}
+.c-head h1{margin:0;font:500 22px var(--display)}
+.c-head select,.c-head .btn{font:inherit;font-size:13px;border-radius:8px;padding:6px 10px;border:0}
+.c-head .btn{background:var(--gold);color:var(--navy-d);font-weight:600;cursor:pointer}
+.c-tabs{display:flex;gap:2px;margin-top:14px;overflow-x:auto}
+.c-tabs button{font:inherit;font-weight:600;font-size:13px;background:transparent;color:#C9C7E6;border:0;padding:10px 14px;border-radius:8px 8px 0 0;cursor:pointer;flex:none}
+.c-tabs button.on{background:var(--bg);color:var(--navy)}
+.c-body{padding:16px 20px 24px;display:flex;flex-direction:column;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.chip{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--fg);border-radius:999px;padding:5px 11px;cursor:pointer}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.c-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.c-k{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.c-k .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.c-k .v{font:500 24px var(--display)}.c-k .d{font-size:11px}
+.c-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+.c-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.c-card h3{margin:0 0 8px;font-size:13px}
+.c-card tbody tr{cursor:pointer}.c-card tbody tr:hover td{background:#F5F5FA}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(360px,92%);background:#fff;border-left:1px solid var(--line);box-shadow:-20px 0 40px rgba(27,25,64,.18);transform:translateX(105%);transition:transform .35s ease;padding:20px;display:flex;flex-direction:column;gap:12px;z-index:5}
+.drawer.on{transform:none}
+.drawer h3{margin:0;font:500 22px var(--display)}
+.drawer .x{align-self:flex-end;font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;cursor:pointer}
+.dl{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:13px}.dl span:nth-child(odd){color:var(--muted)}
+.c-pane{display:none}.c-pane.on{display:flex;flex-direction:column;gap:12px}
+@media (max-width:760px){.c-grid{grid-template-columns:1fr}}
+.sample{font-size:11px;color:var(--muted);text-align:center;padding:8px}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div><b>ROPA Dashboard: pick a direction</b> <small>· sample numbers, layout preview only</small></div>
+  <div class="pick" role="tablist">
+    <button role="tab" aria-selected="true" data-o="A">A · Command Center</button>
+    <button role="tab" aria-selected="false" data-o="B">B · Executive Story</button>
+    <button role="tab" aria-selected="false" data-o="C">C · Analyst Workspace</button>
+  </div>
+</div>
+
+<div class="intro" id="intro"></div>
+
+<div class="frame"><div class="stage">
+
+<!-- ================= A ================= -->
+<section class="opt on" id="A">
+  <div class="a-wrap">
+    <nav class="a-side">
+      <div class="a-logo"><i>▮</i>ROPA</div>
+      <a href="#" class="on" data-v="ov">Overview</a><a href="#" data-v="sales">Sales</a><a href="#" data-v="loss">Losses <span>3</span></a><a href="#" data-v="inv">Inventory</a><a href="#" data-v="fmv">FMV generator</a>
+    </nav>
+    <div class="a-main">
+      <div class="a-bar">
+        <div><div class="live"><i></i>Live · auto-refresh every 5 min · updated 2 min ago</div><h1 id="a-h1">Sales overview</h1></div>
+      </div>
+      <div class="months" id="a-months"></div>
+      <div class="a-pane" id="av-sales">
+        <div class="a-grid"><div class="a-card"><h3>Units sold, 2026 vs 2025</h3><div id="a-ubars"></div></div>
+        <div class="a-card"><h3>Top sales associates</h3><div class="feed" id="a-assoc"></div></div></div>
+        <div class="a-card"><h3>Sold by unit condition</h3><div id="a-cond"></div></div>
+      </div>
+      <div class="a-pane" id="av-loss">
+        <div class="alert"><span>⚠</span><div><b>3 items need attention.</b> Recovery rate is under target, poor-condition units caused 61% of the net loss, and storage fees rose 14%.</div></div>
+        <div class="a-grid"><div class="a-card"><h3>Non-starter accounts per division</h3><div class="tw"><table id="a-ns"></table></div></div>
+        <div class="a-card"><h3>Disposal costs</h3><div class="tw"><table id="a-cost"></table></div></div></div>
+        <div class="a-card"><h3>Top 10 loss units</h3><div class="tw"><table id="a-t10"></table></div></div>
+      </div>
+      <div class="a-pane" id="av-inv">
+        <div class="a-kpis" id="a-ikpis"></div>
+        <div class="a-card"><h3>Month-end inventory by status, vs last month</h3><p class="hint">For units on hand, an increase is shown in red</p><div class="tw"><table id="a-inv"></table></div></div>
+      </div>
+      <div class="a-pane" id="av-fmv">
+        <div class="a-grid"><div class="a-card"><h3>Estimate a unit's fair market value</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+            <label class="hint" style="margin:0">Product type<select class="a-in"><option>Sedan</option><option>SUV</option><option>Motorcycle</option></select></label>
+            <label class="hint" style="margin:0">Condition<select class="a-in"><option>Fair</option><option>Good</option><option>Poor</option></select></label>
+            <label class="hint" style="margin:0">Year model<select class="a-in"><option>2019</option><option>2020</option><option>2021</option></select></label>
+            <label class="hint" style="margin:0">Mileage<select class="a-in"><option>60–90K km</option><option>under 60K km</option></select></label>
+          </div></div>
+          <div class="a-card"><h3>Estimated FMV</h3><div class="a-k" style="border:0;padding:0;background:none"><div class="v">₱418,000</div><div class="d" style="color:var(--muted)">Range ₱372K – ₱461K · based on 5 comparable sold units</div></div></div></div>
+      </div>
+      <div class="a-pane on" id="av-ov">
+      <div class="alert"><span>⚠</span><div><b>Recovery rate is under target.</b> <span id="a-alert">78.4% vs 83% target. 2-wheelers in poor condition caused 61% of this month's net loss.</span></div></div>
+      <div class="a-kpis" id="a-kpis"></div>
+      <div class="a-grid">
+        <div class="a-card"><h3>Monthly sales, 2026 vs 2025</h3><p class="hint">Click a month to filter the whole page</p><div id="a-line"></div></div>
+        <div class="a-card"><h3>Recent sold units</h3><div class="feed" id="a-feed"></div></div>
+      </div>
+      <div class="a-grid">
+        <div class="a-card"><h3>Top 5 product types by units sold</h3><div class="tw"><table id="a-top"></table></div></div>
+        <div class="a-card"><h3>Sold by division</h3><div id="a-donut"></div></div>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= B ================= -->
+<section class="opt" id="B">
+  <div class="b-hero">
+    <div class="eb">ROPA · Sales performance</div>
+    <h1 id="b-head"></h1>
+    <div class="b-scrub">
+      <label><span>Drag to change month</span><b id="b-mlabel" style="color:#fff"></b></label>
+      <input type="range" id="b-range" min="0" max="9" value="9">
+      <div class="b-ticks" id="b-ticks"></div>
+    </div>
+  </div>
+  <div class="b-body">
+    <div class="b-big" id="b-big"></div>
+    <div class="b-sec fade">
+      <div><h2>Sales are trending above last year</h2><p>Each month's sales against the same month in 2025. The gold line is this year.</p></div>
+      <div class="card"><div id="b-line"></div></div>
+    </div>
+    <div class="b-sec fade">
+      <div><h2>Where the units came from</h2><p>Units sold by product type, with each one's recovery rate.</p></div>
+      <div class="card"><div class="bars" id="b-bars"></div></div>
+    </div>
+    <div class="b-sec fade">
+      <div><h2>What's costing us</h2><p>The cause-of-losses section, summed up first, with the detail tables underneath.</p></div>
+      <div class="card" style="display:flex;flex-direction:column;gap:10px">
+        <div class="b-insight">💡 <span><b>Poor-condition units</b> are 22% of units sold but <b>61% of the net loss</b>. Repairing them before sale could help most.</span></div>
+        <div class="b-insight">💡 <span><b>Storage fees</b> went up 14% month over month. 38 units have been on hand for more than 180 days.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C ================= -->
+<section class="opt" id="C">
+  <div class="c-head">
+    <div class="c-row">
+      <div><div style="color:var(--gold);font-size:11px;letter-spacing:.1em;font-weight:600">ROPA · SALES PERFORMANCE</div><h1>Workspace</h1></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><select id="c-month"></select><button class="btn" type="button">Export CSV</button></div>
+    </div>
+    <div class="c-tabs" id="c-tabs"><button class="on" data-p="ov">Overview</button><button data-p="loss">Cause of losses</button><button data-p="inv">Inventory</button><button data-p="fmv">FMV generator</button></div>
+  </div>
+  <div class="c-body">
+    <div class="chips" id="c-chips"></div>
+    <div class="c-pane on" id="p-ov">
+      <div class="c-kpis" id="c-kpis"></div>
+      <div class="c-grid">
+        <div class="c-card"><h3>Units sold by month</h3><div id="c-bars"></div></div>
+        <div class="c-card"><h3>Top loss units <span style="font-weight:400;color:var(--muted)">· click a row for details</span></h3><div class="tw"><table id="c-loss"></table></div></div>
+      </div>
+    </div>
+    <div class="c-pane" id="p-loss"><div class="c-card"><h3>Cause of losses</h3><p style="color:var(--muted);margin:0">The loss tables (by division, condition, product type and disposal cost) go here, each with its own tab, and the filters above apply to all of them.</p></div></div>
+    <div class="c-pane" id="p-inv"><div class="c-card"><h3>Inventory breakdown</h3><p style="color:var(--muted);margin:0">The month-end inventory by status table goes here, compared with the month before.</p></div></div>
+    <div class="c-pane" id="p-fmv"><div class="c-card"><h3>FMV generator</h3><p style="color:var(--muted);margin:0">The FMV generator becomes a tab here instead of a separate page.</p></div></div>
+  </div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <button class="x" type="button" id="dx">Close ✕</button>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Unit details</div>
+    <h3 id="d-name"></h3>
+    <div class="dl" id="d-dl"></div>
+    <div class="b-insight" style="margin-top:6px"><span>Comparable units in the FMV data sold for an average of <b>₱412K</b>.</span></div>
+  </aside>
+</section>
+
+<div class="sample">Sample numbers only. The real dashboard keeps reading your Google Sheet.</div>
+</div></div>
+
+<script>
+const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const s25=[38,41,36,44,47,43,49,52,46,50,48,55], s26=[42,45,44,51,49,53,58,56,61,64];
+const u25=[92,98,88,104,110,101,115,121,108,117,112,128], u26=[101,106,104,118,113,124,133,129,140,147];
+const rec=[.81,.84,.79,.82,.85,.80,.83,.86,.81,.784];
+const peso=v=>'₱'+v.toFixed(1)+'M';
+const intro={
+A:['A · Command Center','A dark, always-on dashboard for daily use on a big screen.',['A sidebar replaces the long scroll, with one page each for Sales, Losses and Inventory','Month buttons replace the dropdown, and clicking a chart filters the whole page','Numbers count up and each KPI gets a small trend line','Red alerts appear when something misses target, like recovery rate under 83%','A live indicator and a feed of recently sold units']],
+B:['B · Executive Story','A light page that reads top to bottom, for managers and presentations.',['A plain-language headline sums up the month','Drag a slider to move through the months, and every number updates','Big numbers first, then each section explains what the chart shows','Sections and bars animate in as you scroll','Insight boxes point out what matters, like where losses come from']],
+C:['C · Analyst Workspace','A dense, tab-based tool for the team that digs into the numbers.',['Tabs (Overview, Losses, Inventory, FMV) replace the long page, and FMV moves in as a tab','Filter chips for division, condition and product apply to everything at once','Click any table row to open a detail panel for that unit','Compact KPIs fit more on one screen','An Export CSV button for the current view']]};
+function setIntro(o){const [t,d,l]=intro[o];document.getElementById('intro').innerHTML=`<h2>${t}</h2><p>${d}</p><ul>${l.map(x=>`<li>${x}</li>`).join('')}</ul>`}
+document.querySelectorAll('.pick button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pick button').forEach(x=>x.setAttribute('aria-selected',x===b));document.querySelectorAll('.opt').forEach(x=>x.classList.toggle('on',x.id===b.dataset.o));setIntro(b.dataset.o);if(b.dataset.o==='B')renderB(+document.getElementById('b-range').value);if(b.dataset.o==='A')renderA(aSel);if(b.dataset.o==='C')renderC();});
+setIntro('A');
+
+function countUp(el,to,fmt,ms=900){const t0=performance.now();const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;function f(t){const p=reduce?1:Math.min(1,(t-t0)/ms),e=1-Math.pow(1-p,3);el.textContent=fmt(to*e);if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+function spark(data,color){const w=70,h=26,mx=Math.max(...data),mn=Math.min(...data);const pts=data.map((v,i)=>`${i*w/(data.length-1)},${h-(v-mn)/(mx-mn||1)*h}`).join(' ');return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
+function lineChart(box,a,b,sel,opt={}){const W=Math.max(280,box.clientWidth||600),H=opt.h||220,ml=40,mb=22;const mx=Math.max(...a,...b)*1.1;const x=i=>ml+i*(W-ml-10)/11,y=v=>H-mb-(v/mx)*(H-mb-10);
+let g='';[0,20,40,60].forEach(t=>{if(t<=mx)g+=`<line x1="${ml}" x2="${W-6}" y1="${y(t)}" y2="${y(t)}" stroke="${opt.grid}"/><text x="${ml-6}" y="${y(t)}" dy=".32em" text-anchor="end" font-size="11" fill="${opt.muted}">₱${t}M</text>`});
+M.forEach((m,i)=>g+=`<text x="${x(i)}" y="${H-5}" text-anchor="middle" font-size="11" fill="${i===sel?opt.fg:opt.muted}" font-weight="${i===sel?600:400}">${m}</text>`);
+const p=d=>d.map((v,i)=>`${i?'L':'M'}${x(i)},${y(v)}`).join('');const len=3000;
+g+=`<path d="${p(a)}" fill="none" stroke="${opt.cm}" stroke-width="2"/>`;
+g+=`<path d="${p(b)}" fill="none" stroke="${opt.acc}" stroke-width="2.5" stroke-dasharray="${len}" stroke-dashoffset="${len}"><animate attributeName="stroke-dashoffset" to="0" dur="1s" fill="freeze"/></path>`;
+b.forEach((v,i)=>g+=`<circle cx="${x(i)}" cy="${y(v)}" r="${i===sel?6:3}" fill="${opt.acc}" stroke="${opt.panel}" stroke-width="2" data-i="${i}" style="cursor:pointer"/><rect x="${x(i)-14}" y="0" width="28" height="${H-mb}" fill="transparent" data-i="${i}" style="cursor:${opt.click?'pointer':'default'}"/>`);
+box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg>`;if(opt.click)box.querySelectorAll('[data-i]').forEach(e=>e.onclick=()=>opt.click(+e.dataset.i))}
+function donut(box,data,cols,fg,muted){const R=70,tot=data.reduce((s,d)=>s+d[1],0);let a=-Math.PI/2,g='';data.forEach((d,i)=>{const a2=a+d[1]/tot*Math.PI*2,lg=a2-a>Math.PI?1:0;const p=(r,t)=>[90+r*Math.cos(t),90+r*Math.sin(t)];const [x1,y1]=p(R,a),[x2,y2]=p(R,a2),[x3,y3]=p(R*.62,a2),[x4,y4]=p(R*.62,a);g+=`<path d="M${x1},${y1}A${R},${R} 0 ${lg} 1 ${x2},${y2}L${x3},${y3}A${R*.62},${R*.62} 0 ${lg} 0 ${x4},${y4}Z" fill="${cols[i]}"><title>${d[0]}: ${d[1]}</title></path>`;a=a2});
+g+=`<text x="90" y="88" text-anchor="middle" font-size="24" fill="${fg}" font-family="Newsreader">${tot}</text><text x="90" y="106" text-anchor="middle" font-size="11" fill="${muted}">units</text>`;
+const lg=data.map((d,i)=>`<div style="display:flex;gap:8px;align-items:center;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:${cols[i]}"></i>${d[0]} <span style="color:${muted};margin-left:auto">${d[1]}</span></div>`).join('');
+box.innerHTML=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><svg width="180" height="180">${g}</svg><div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:120px">${lg}</div></div>`}
+const topP=[['Motorcycle',62,4.1,.86],['Sedan',31,9.8,.81],['SUV',22,8.7,.79],['Pick-up',18,6.2,.84],['Van',14,3.9,.72]];
+const rc=r=>r>=.83?'good':r>=.73?'warn':'bad';
+
+/* A */
+let aSel=9;
+function renderA(i){aSel=i;const mb=document.getElementById('a-months');mb.innerHTML=M.slice(0,10).map((m,j)=>`<button class="${j===i?'on':''}" data-i="${j}">${m} 2026</button>`).join('');mb.querySelectorAll('button').forEach(b=>b.onclick=()=>renderA(+b.dataset.i));
+const k=[['Total sales',s26[i],peso,s26,(s26[i]/(s26[i-1]||s26[i])-1)],['Units sold',u26[i],v=>Math.round(v).toLocaleString(),u26,(u26[i]/(u26[i-1]||u26[i])-1)],['Recovery rate',rec[i]*100,v=>v.toFixed(1)+'%',rec,(rec[i]-.83)],['Gain / (loss)',-(4.2+i*.3),v=>'-₱'+Math.abs(v).toFixed(1)+'M',s26.map(v=>-v),-.06]];
+document.getElementById('a-kpis').innerHTML=k.map((x,j)=>`<div class="a-k"><div class="l">${x[0]}</div><div class="v num" id="ak${j}">0</div><div class="d ${x[4]>=0?'good':'bad'}">${x[4]>=0?'▲':'▼'} ${(Math.abs(x[4])*100).toFixed(1)}${j===2?' pts vs target':'% vs last month'}</div>${spark(x[3].slice(0,i+1),x[4]>=0?'#5CC88A':'#F2726A')}</div>`).join('');
+k.forEach((x,j)=>countUp(document.getElementById('ak'+j),x[1],x[2]));
+document.getElementById('a-alert').textContent=`${(rec[i]*100).toFixed(1)}% in ${M[i]} vs 83% target. Poor-condition 2-wheelers caused 61% of the net loss.`;
+document.getElementById('a-alert').closest('.alert').style.display=rec[i]<.83?'flex':'none';
+lineChart(document.getElementById('a-line'),s25,s26,i,{grid:'#26244F',muted:'#A9A7C9',fg:'#fff',cm:'#3B3870',acc:'#FBCB0A',panel:'#1B1940',click:renderA});
+document.getElementById('a-feed').innerHTML=[['Honda Click 125i','₱62K','2h ago'],['Toyota Vios 1.3 E','₱418K','5h ago'],['Mitsubishi L300','₱585K','Yesterday'],['Yamaha NMAX','₱88K','Yesterday'],['Suzuki Ertiga','₱512K','2 days ago']].map(r=>`<div><span>${r[0]}<br><span style="color:var(--muted)">${r[2]}</span></span><b class="num">${r[1]}</b></div>`).join('');
+document.getElementById('a-top').innerHTML='<tr><th>Product</th><th>Units</th><th>Amount</th><th>Recovery</th></tr>'+topP.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>₱${r[2]}M</td><td><span class="pill ${rc(r[3])}">${(r[3]*100).toFixed(1)}%</span></td></tr>`).join('');
+donut(document.getElementById('a-donut'),[['Motorcycle',71],['Auto',48],['SME',18],['Housing',10]],['#FBCB0A','#8F8BDB','#E9E8F2','#B98A00'],'#fff','#A9A7C9')}
+renderA(9);
+/* A: sidebar pages */
+const aTitles={ov:'Sales overview',sales:'Sales',loss:'Cause of losses',inv:'Inventory',fmv:'FMV generator'};
+const tbl=(h,rows)=>'<tr>'+h.map(x=>`<th>${x}</th>`).join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join('');
+const pl=r=>`<span class="pill ${rc(r)}">${(r*100).toFixed(1)}%</span>`;
+function fillA(){
+ const W=Math.max(280,document.getElementById('a-ubars').clientWidth||560),H=210;let g='';M.forEach((m,j)=>{const bw=((W-20)/12-6)/2,x=10+j*(W-20)/12,h1=u25[j]/160*(H-30),h2=u26[j]!=null?u26[j]/160*(H-30):0;g+=`<rect x="${x}" y="${H-22-h1}" width="${bw}" height="${h1}" rx="2" fill="#3B3870"/>`+(u26[j]!=null?`<rect x="${x+bw+2}" y="${H-22-h2}" width="${bw}" height="${h2}" rx="2" fill="#FBCB0A"/>`:'')+`<text x="${x+bw}" y="${H-6}" text-anchor="middle" font-size="11" fill="#A9A7C9">${m}</text>`});document.getElementById('a-ubars').innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg>`;
+ document.getElementById('a-assoc').innerHTML=[['Associate 1',34],['Associate 2',29],['Associate 3',22],['Associate 4',18],['Associate 5',15]].map(r=>`<div><span>${r[0]}</span><b class="num">${r[1]} units</b></div>`).join('');
+ donut(document.getElementById('a-cond'),[['Good',58],['Fair',57],['Poor',32]],['#5CC88A','#FBCB0A','#F2726A'],'#fff','#A9A7C9');
+ document.getElementById('a-ns').innerHTML=tbl(['Division','Units','Gain/(loss)','Recovery'],[['Motorcycle',9,'<span class="bad">-₱0.4M</span>',pl(.71)],['Auto',6,'<span class="bad">-₱1.2M</span>',pl(.64)],['SME',2,'<span class="bad">-₱0.3M</span>',pl(.69)]]);
+ document.getElementById('a-cost').innerHTML=tbl(['Cost','Amount','% of sold'],[['Storage','₱1.21M','1.9%'],['Towing','₱0.48M','0.8%'],['Repair','₱0.92M','1.4%'],['Commissions','₱1.60M','2.5%'],['Legal + notarial','₱0.31M','0.5%']]);
+ document.getElementById('a-t10').innerHTML=tbl(['Unit','Product','Condition','Net loss','Recovery'],loss.map(r=>[r[0],r[1],r[2],`<span class="bad">-₱${Math.abs(r[3])}K</span>`,pl(r[4])]));
+ const inv=[['For sale',214,201],['Under repair',48,55],['In transit',31,26],['Legal hold',22,22],['Redeemed',9,14],['Sold',140,147]];
+ document.getElementById('a-ikpis').innerHTML=[['Units on hand',304,'#F2726A','▲ 4 vs Sep'],['Target',360,'#A9A7C9','56 under target'],['Avg days on hand',146,'#5CC88A','▼ 9 days vs Sep']].map(k=>`<div class="a-k"><div class="l">${k[0]}</div><div class="v num">${k[1]}</div><div class="d" style="color:${k[2]}">${k[3]}</div></div>`).join('');
+ document.getElementById('a-inv').innerHTML=tbl(['Status','Sep','Oct','Change'],inv.map((r,i)=>{const d=r[2]-r[1],out=i>=4,good=out?d>0:d<0;return [r[0],r[1],r[2],d===0?'<span style="color:var(--muted)">0</span>':`<span class="${good?'good':'bad'}">${d>0?'+':''}${d}</span>`]}));
+}
+let aFilled=false;
+document.querySelectorAll('.a-side a').forEach(a=>a.onclick=e=>{e.preventDefault();const v=a.dataset.v;document.querySelectorAll('.a-side a').forEach(x=>x.classList.toggle('on',x===a));document.querySelectorAll('.a-pane').forEach(p=>p.classList.toggle('on',p.id==='av-'+v));document.getElementById('a-h1').textContent=aTitles[v];if(!aFilled){fillA();aFilled=true}if(v==='ov')renderA(aSel)});
+
+/* B */
+document.getElementById('b-ticks').innerHTML=M.slice(0,10).map(m=>`<span>${m}</span>`).join('');
+function renderB(i){const up=s26[i]>s25[i];document.getElementById('b-mlabel').textContent=['January','February','March','April','May','June','July','August','September','October'][i]+' 2026';
+document.getElementById('b-head').innerHTML=`In ${M[i]}, we sold <em>${u26[i]} units</em> for ${peso(s26[i])}, ${up?'up':'down'} ${Math.abs((s26[i]/s25[i]-1)*100).toFixed(0)}% on last year.`;
+const big=[['Total sales',s26[i],peso,(s26[i]/s25[i]-1),'vs '+M[i]+' 2025'],['Units sold',u26[i],v=>Math.round(v),(u26[i]/u25[i]-1),'vs '+M[i]+' 2025'],['Recovery rate',rec[i]*100,v=>v.toFixed(1)+'%',rec[i]-.83,'vs 83% target']];
+document.getElementById('b-big').innerHTML=big.map((x,j)=>`<div><div class="v num" id="bk${j}"></div><div class="l">${x[0]}</div><div class="d ${x[3]>=0?'good':'bad'}">${x[3]>=0?'▲':'▼'} ${(Math.abs(x[3])*100).toFixed(1)}${j===2?' pts':'%'} ${x[4]}</div></div>`).join('');
+big.forEach((x,j)=>countUp(document.getElementById('bk'+j),x[1],x[2],600));
+lineChart(document.getElementById('b-line'),s25,s26,i,{grid:'#ECEBF4',muted:'#5B5A77',fg:'#1B1940',cm:'#CFCDE3',acc:'#B98A00',panel:'#fff',h:200});
+const bb=document.getElementById('b-bars');bb.innerHTML=topP.map(r=>`<div class="r"><span>${r[0]}</span><div class="t"><i data-w="${r[1]/62*100}"></i></div><span class="pill ${rc(r[3])}" style="text-align:center">${(r[3]*100).toFixed(0)}%</span></div>`).join('');
+requestAnimationFrame(()=>setTimeout(()=>bb.querySelectorAll('i').forEach(e=>e.style.width=e.dataset.w+'%'),60))}
+document.getElementById('b-range').oninput=e=>renderB(+e.target.value);
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.15});document.querySelectorAll('.fade').forEach(e=>io.observe(e));setTimeout(()=>document.querySelectorAll(".fade").forEach(e=>e.classList.add("in")),2500);
+
+/* C */
+const filt={Division:['All','Motorcycle','Auto','SME'],Condition:['All','Good','Fair','Poor'],Product:['All','2-wheel','4-wheel']};const fs={Division:'All',Condition:'All',Product:'All'};
+const cm=document.getElementById('c-month');cm.innerHTML=M.slice(0,10).map((m,i)=>`<option ${i===9?'selected':''}>${m} 2026</option>`).join('');
+const loss=[['UNIT-0412','Sedan','Poor',-312,.52],['UNIT-0388','SUV','Poor',-288,.58],['UNIT-0455','Pick-up','Fair',-241,.63],['UNIT-0401','Van','Poor',-199,.61],['UNIT-0367','Sedan','Fair',-176,.69],['UNIT-0430','Motorcycle','Poor',-41,.48]];
+function renderC(){const ch=document.getElementById('c-chips');ch.innerHTML=Object.entries(filt).map(([k,v])=>`<span style="margin-left:6px">${k}:</span>`+v.map(o=>`<button class="chip ${fs[k]===o?'on':''}" data-k="${k}" data-v="${o}">${o}</button>`).join('')).join('');
+ch.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{fs[b.dataset.k]=b.dataset.v;renderC()});
+const f=(fs.Division==='All'?1:.4)*(fs.Condition==='All'?1:.33)*(fs.Product==='All'?1:.5),i=cm.selectedIndex;
+const k=[['Sales',peso(s26[i]*f)],['Units',Math.round(u26[i]*f)],['Recovery',(rec[i]*100-(fs.Condition==='Poor'?14:0)).toFixed(1)+'%'],['Gain/(loss)','-₱'+(4.2*f).toFixed(1)+'M'],['Inventory',Math.round(362*f)],['Avg days on hand',fs.Condition==='Poor'?212:146]];
+document.getElementById('c-kpis').innerHTML=k.map(x=>`<div class="c-k"><div class="l">${x[0]}</div><div class="v num">${x[1]}</div></div>`).join('');
+const bx=document.getElementById('c-bars'),W=Math.max(280,bx.clientWidth||500),H=200,mx=160;let g='';u26.forEach((v,j)=>{const bw=(W-30)/10-8,x=20+j*(W-30)/10,h=v*f/mx*(H-30);g+=`<rect x="${x}" y="${H-22-h}" width="${bw}" height="${h}" rx="3" fill="${j===i?'#29265F':'#CFCDE3'}"><title>${M[j]}: ${Math.round(v*f)}</title></rect><text x="${x+bw/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="#5B5A77">${M[j]}</text>`});bx.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg>`;
+const rows=loss.filter(r=>fs.Condition==='All'||r[2]===fs.Condition);
+const t=document.getElementById('c-loss');t.innerHTML='<tr><th>Unit</th><th>Type</th><th>Cond.</th><th>Loss</th></tr>'+(rows.length?rows.map((r,j)=>`<tr data-j="${loss.indexOf(r)}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="bad">-₱${Math.abs(r[3])}K</td></tr>`).join(''):'<tr><td colspan="4" style="color:var(--muted)">No units match these filters</td></tr>');
+t.querySelectorAll('tr[data-j]').forEach(tr=>tr.onclick=()=>{const r=loss[+tr.dataset.j];document.getElementById('d-name').textContent=r[0]+' · '+r[1];document.getElementById('d-dl').innerHTML=`<span>Condition</span><b>${r[2]}</b><span>OPB</span><b>₱${(Math.abs(r[3])/(1-r[4])).toFixed(0)}K</b><span>Sold amount</span><b>₱${(Math.abs(r[3])/(1-r[4])*r[4]).toFixed(0)}K</b><span>Net loss</span><b class="bad">-₱${Math.abs(r[3])}K</b><span>Recovery</span><b><span class="pill ${rc(r[4])}">${(r[4]*100).toFixed(0)}%</span></b><span>Days on hand</span><b>${180+r[3]%40*-1}</b><span>Storage + towing</span><b>₱${(Math.abs(r[3])*.08).toFixed(1)}K</b>`;document.getElementById('drawer').classList.add('on')})}
+cm.onchange=renderC;document.getElementById('dx').onclick=()=>document.getElementById('drawer').classList.remove('on');
+document.querySelectorAll('#c-tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#c-tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.c-pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.p))});
+</script>
+</body>
+</html>

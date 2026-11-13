@@ -1,5 +1,5 @@
-/* ROPA FMV generator page: loads the sold-units history from the published Google Sheet (parts 3 and 4)
- * and runs the estimate in the browser (fmv-engine.js). Individual past sales are never listed. */
+/* ROPA FMV generator (the FMV menu of index.html): loads the sold-units history from fmv-data.xlsx (or parts 3-4 of the published
+ * Google Sheet) and runs the estimate in the browser (fmv-engine.js). Individual past sales are never listed. */
 (function () {
   'use strict';
   const C = window.ROPA_CONFIG || {};
@@ -31,6 +31,7 @@
     trans: ['TRANSMISSION/FUEL', 'TRANSMISSION', 'TRANSMISSION / FUEL'], cond: ['CONDITION CLASS (DASH)', 'CONDITION', "CLASSIFICATION OF UNIT'S CONDITION"],
     year: ['YEAR MODEL', 'YEAR'], km: ['MILEAGE', 'KM'], price: ['SOLD AMOUNT', 'SOLD PRICE', 'PRICE'], date: ['DATE SOLD', 'SOLD DATE', 'DATE'],
   };
+  const dayOf = (v) => (window.DASH ? window.DASH.dayOf(v) : null);
   const numOf = (v) => (typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/[^0-9.]/g, '')) || 0);
   function monthOf(v) {
     if (v instanceof Date && !isNaN(v)) return (v.getFullYear() - 2000) * 12 + v.getMonth();
@@ -48,6 +49,8 @@
     if (missing.length) throw new Error('fmv-data.xlsx is missing these columns in row 1: ' + missing.map((k) => COLS[k][0]).join(', ') + '.');
     const get = (r, k) => (at[k] === undefined ? '' : r[at[k]]);
     const units = [];
+    // Every row's DATE SOLD, cleaned or not, for the dashboard's sold-per-day calendar
+    units.allDays = rows.slice(1).map((r) => dayOf(get(r, 'date'))).filter(Boolean);
     let latest = 0;
     rows.slice(1).forEach((r) => {
       const price = numOf(get(r, 'price')), year = Math.round(numOf(get(r, 'year')));
@@ -55,7 +58,7 @@
       const month = monthOf(get(r, 'date'));
       if (month != null) latest = Math.max(latest, month);
       units.push({ brand: get(r, 'brand'), series: get(r, 'series'), product: get(r, 'product'), body: get(r, 'body'), trans: get(r, 'trans'),
-        cond: get(r, 'cond'), year, km: numOf(get(r, 'km')) || null, price, month });
+        cond: get(r, 'cond'), year, km: numOf(get(r, 'km')) || null, price, month, day: dayOf(get(r, 'date')) });
     });
     units.forEach((u) => { if (u.month == null) u.month = latest; });
     if (!units.length) throw new Error('fmv-data.xlsx has no sold units with a sold amount, brand and year model.');
@@ -68,17 +71,18 @@
     if (r.ok && window.XLSX) {
       const wb = XLSX.read(await r.arrayBuffer(), { type: 'array', cellDates: true });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
-      return { units: fromSheet(rows), asOf: r.headers.get('last-modified') };
+      const units = fromSheet(rows);
+      return { units, days: units.allDays, asOf: r.headers.get('last-modified') };
     }
     const useSheet = C.sheetCsvUrl && !/PASTE-/.test(C.sheetCsvUrl);
-    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     const g = await fetch(C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
-    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     const rows = parseCsv(await g.text());
     const head = rows[0].map((h) => h.trim().toLowerCase());
     const pi = head.indexOf('part'), di = head.indexOf('data');
     const parts = rows.slice(1).filter((x) => Number(x[pi]) >= 3 && x[di]).sort((a, b) => Number(a[pi]) - Number(b[pi])).map((x) => x[di]);
-    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     let acc = '';
     for (const p of parts) { acc += p; try { const f = JSON.parse(acc); return { units: FMV.unpack(f), asOf: f.generated_at }; } catch (e) { /* keep joining */ } }
     throw new Error('The sales history in the Google Sheet is incomplete. Reload in a minute.');
@@ -176,13 +180,14 @@
   $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
     lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
 
-  loadFmv().then((f) => {
-    $('loading').hidden = true;
+  // The dashboard's Sales and Losses menus use the same sales history (sold per day, brand/series).
+  window.ROPA_SALES = loadFmv();
+  window.ROPA_SALES.then((f) => {
     model = FMV.prepare(f.units);
     const opt = FMV.options(model);
     setupForm(opt);
     const months = model.units.map((u) => u.month);
-    $('asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
+    $('fmv-asof').textContent = `${model.units.length.toLocaleString('en-PH')} sold units, ${monthName(Math.min.apply(null, months))} – ${monthName(Math.max.apply(null, months))}` +
       (f.asOf && !isNaN(new Date(f.asOf)) ? ' · File updated ' + new Date(f.asOf).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-  }).catch((e) => { $('loading').hidden = true; const el = $('load-err'); el.textContent = e.message; el.hidden = false; $('asof').textContent = ''; });
+  }).catch((e) => { const el = $('fmv-err'); el.textContent = e.message; el.hidden = false; $('fmv-asof').textContent = ''; });
 })();
