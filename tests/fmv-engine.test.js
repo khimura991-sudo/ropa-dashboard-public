@@ -29,3 +29,10 @@ test('valuesFor lists body types and transmissions a brand + model was sold with
   assert.deepEqual(FMV.valuesFor(m2, 'TOYOTA', 'VIOS', 'product'), ['CAR FINANCING']);
   assert.equal(FMV.valuesFor(m2, 'TOYOTA', 'NEVER SOLD', 'body'), null);
 });
+
+test('brandsWithModel finds which brands a model was sold under', () => {
+  assert.deepEqual(FMV.brandsWithModel(m, 'VIOS 1.5 G'), ['TOYOTA']);
+  assert.deepEqual(FMV.brandsWithModel(m, 'GIGA'), ['ISUZU']);
+  assert.deepEqual(FMV.brandsWithModel(m, 'NEVER SOLD'), []);
+  assert.deepEqual(FMV.brandsWithModel(m, ''), []);
+});

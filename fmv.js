@@ -125,6 +125,10 @@
       [...sel.options].slice(1).forEach((o) => { o.textContent = label(o.value); });
       sel.value = list.includes(keep) ? keep : '';
     });
+    $('f-brand').addEventListener('change', () => {
+      const ser = $('f-series').value.trim(), brands = ser ? FMV.brandsWithModel(model, ser) : [];
+      if (brands.length && !brands.includes($('f-brand').value)) $('f-series').value = '';
+    });
     updChoices();
     $('f-brand').addEventListener('change', updChoices);
     $('f-series').addEventListener('change', updChoices);
@@ -192,18 +196,33 @@
     renderComps();
   }
 
+  // Any change to the form hides the last result, so a value is never shown for details that no longer match
+  function clearResult() {
+    $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
+    lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true;
+    $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.';
+  }
+  $('fmv-form').addEventListener('input', clearResult);
+  $('fmv-form').addEventListener('change', clearResult);
+
   $('fmv-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const q = { brand: $('f-brand').value, series: $('f-series').value.trim(), year: $('f-year').value, product: $('f-product').value,
       body: $('f-body').value, trans: $('f-trans').value, km: $('f-km').value, cond: $('f-cond').value };
     const err = $('form-err');
     if (!q.brand || !q.series || !q.year) { err.textContent = 'Please fill in the brand, model / series and year model.'; err.hidden = false; return; }
+    const owners = FMV.brandsWithModel(model, q.series);
+    if (owners.length && !owners.includes(q.brand)) {
+      clearResult();
+      err.textContent = `No ${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))} has been sold. ${title(FMV.modelOf(q.series, q.brand))} is sold under ${owners.map(title).join(', ')}. Check the brand.`;
+      err.hidden = false; return;
+    }
     const NAMES = { product: 'Product type', body: 'Body type', trans: 'Transmission / fuel' };
     for (const f of ['product', 'body', 'trans']) {
       const sold = q[f] ? FMV.valuesFor(model, q.brand, q.series, f) : null;
       if (!sold || sold.includes(q[f])) continue;
       const lab = f === 'product' ? title : (x) => x, unit = `${title(q.brand)} ${title(FMV.modelOf(q.series, q.brand))}`;
-      $('result-empty').hidden = false; $('result-body').hidden = true; lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true;
+      clearResult();
       err.textContent = f === 'product'
         ? `No ${unit} has been sold under ${lab(q[f])}. Choose "Any" or one of: ${sold.map(lab).join(', ')}.`
         : `No ${unit} has been sold with ${NAMES[f].toLowerCase()} "${lab(q[f])}". Choose "Any" or one of: ${sold.map(lab).join(', ')}.`;
@@ -216,8 +235,7 @@
     showComps(e);
     if (window.matchMedia('(max-width: 860px)').matches) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  $('fmv-form').addEventListener('reset', () => { $('result-empty').hidden = false; $('result-body').hidden = true; $('form-err').hidden = true;
-    lastTop = []; $('comps-wrap').hidden = true; $('comps-foot').hidden = true; $('btn-more').hidden = true; $('comps-note').textContent = 'Get a fair market value to see the closest sold units it was based on.'; });
+  $('fmv-form').addEventListener('reset', clearResult);
 
   // The dashboard's Sales and Losses menus use the same sales history (sold per day, brand/series).
   window.ROPA_SALES = loadFmv();
