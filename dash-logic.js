@@ -90,6 +90,52 @@
     };
   }
 
-  const api = { dayOf, workdayCalendar, topBrandModels, bigLosses, invKpis };
+  // ---------------------------------------------------------------- market reference (market-prices.xlsx)
+  const MK = { month: ['MONTH'], brand: ['BRAND'], model: ['MODEL', 'MODEL / SERIES', 'SERIES'], year: ['YEAR MODEL', 'YEAR'],
+    type: ['LISTING TYPE', 'TYPE'], price: ['ASKING PRICE', 'PRICE'] };
+  const monthKey = (v) => {
+    const s = String(v == null ? '' : v).trim(), m = s.match(/^(\d{4})-(\d{1,2})$/);
+    if (m) return `${m[1]}-${pad(+m[2])}`;
+    const d = dayOf(v);
+    return d ? d.slice(0, 7) : null;
+  };
+  const priceOf = (v) => (typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/[^0-9.]/g, '')) || 0);
+
+  // Rows of the market-price sheet (row 1 = column names) -> listings. Rows missing a required value are skipped.
+  function parseMarket(rows) {
+    if (!rows || !rows.length) return [];
+    const head = rows[0].map((h) => String(h == null ? '' : h).replace(/\s+/g, ' ').trim().toUpperCase()), at = {};
+    Object.keys(MK).forEach((k) => { at[k] = MK[k].map((n) => head.indexOf(n)).find((i) => i >= 0); });
+    if (Object.values(at).some((i) => i === undefined)) return [];
+    const out = [];
+    rows.slice(1).forEach((r) => {
+      const brand = String(r[at.brand] == null ? '' : r[at.brand]).trim(), model = String(r[at.model] == null ? '' : r[at.model]).trim();
+      const year = Math.round(priceOf(r[at.year])), price = priceOf(r[at.price]), month = monthKey(r[at.month]);
+      if (!brand || !model || !(year > 1980) || !(price > 0) || !month) return;
+      out.push({ brand, model, year, type: /REPO/i.test(String(r[at.type] || '')) ? 'repo' : 'used', price, month });
+    });
+    return out;
+  }
+
+  // Asking-price ranges for the queried brand + model + year from the last 3 months, compared with the ROPA estimate.
+  function marketRef(list, q, fmv, today, ropa) {
+    if (!list || !list.length) return null;
+    const key = (b, m) => fmv.cleanBrand(b) + '|' + fmv.modelOf(m, b);
+    const want = key(q.brand, q.series), y = Number(q.year);
+    const from = new Date(today.getFullYear(), today.getMonth() - 2, 1), fromKey = `${from.getFullYear()}-${pad(from.getMonth() + 1)}`;
+    const recent = list.filter((x) => x.month >= fromKey && key(x.brand, x.model) === want);
+    let rows = recent.filter((x) => x.year === y), yearNote = '';
+    if (!rows.length) { rows = recent.filter((x) => Math.abs(x.year - y) === 1); yearNote = rows.length ? '±1 year' : ''; }
+    if (!rows.length) return null;
+    const stat = (t) => {
+      const p = rows.filter((x) => x.type === t).map((x) => x.price).sort((a, b) => a - b);
+      if (!p.length) return null;
+      const mid = p.length % 2 ? p[(p.length - 1) / 2] : (p[p.length / 2 - 1] + p[p.length / 2]) / 2;
+      return { low: p[0], high: p[p.length - 1], median: mid, n: p.length, pct: ropa / mid };
+    };
+    return { yearNote, repo: stat('repo'), used: stat('used') };
+  }
+
+  const api = { dayOf, workdayCalendar, topBrandModels, bigLosses, invKpis, parseMarket, marketRef };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DASH = api;
 })(this);

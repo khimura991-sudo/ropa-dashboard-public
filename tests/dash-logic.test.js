@@ -65,3 +65,46 @@ test('invKpis sums on hand, under legal and for sale', () => {
   assert.equal(invKpis([]), null);
   assert.equal(invKpis(null), null);
 });
+
+const { parseMarket, marketRef } = require('../dash-logic.js');
+const fakeFmv = { cleanBrand: (s) => String(s).toUpperCase().trim().replace('MITSUBIHSI', 'MITSUBISHI'), modelOf: (s) => { const t = String(s).toUpperCase().split(' '); return /^[A-Z]\d$/.test(t[1] || '') ? t[0] + ' ' + t[1] : t[0]; } };
+
+test('parseMarket maps headers in any order and cleans prices', () => {
+  const rows = [
+    ['asking price', 'Brand', 'MODEL', 'Year Model', 'Listing Type', 'Month', 'Link'],
+    ['₱ 398,000', 'toyota', 'vios', 2020, 'Bank repo', '2026-11', 'x'],
+    [470000, 'TOYOTA', 'VIOS', '2020', 'Regular used', new Date(2026, 10, 3), ''],
+    ['', 'TOYOTA', 'VIOS', 2020, 'Bank repo', '2026-11', ''], // no price
+    [500000, '', 'VIOS', 2020, 'Bank repo', '2026-11', ''], // no brand
+  ];
+  assert.deepEqual(parseMarket(rows), [
+    { brand: 'toyota', model: 'vios', year: 2020, type: 'repo', price: 398000, month: '2026-11' },
+    { brand: 'TOYOTA', model: 'VIOS', year: 2020, type: 'used', price: 470000, month: '2026-11' },
+  ]);
+  assert.deepEqual(parseMarket([]), []);
+});
+
+test('marketRef: exact year, last 3 months, median comparison', () => {
+  const L = [
+    { brand: 'Toyota', model: 'Vios 1.3', year: 2020, type: 'repo', price: 398000, month: '2026-11' },
+    { brand: 'TOYOTA', model: 'VIOS', year: 2020, type: 'repo', price: 425000, month: '2026-09' },
+    { brand: 'TOYOTA', model: 'VIOS', year: 2020, type: 'used', price: 470000, month: '2026-11' },
+    { brand: 'TOYOTA', model: 'VIOS', year: 2020, type: 'repo', price: 999000, month: '2026-08' }, // too old
+    { brand: 'TOYOTA', model: 'VIOS', year: 2021, type: 'repo', price: 500000, month: '2026-11' }, // other year
+  ];
+  const r = marketRef(L, { brand: 'TOYOTA', series: 'VIOS', year: '2020' }, fakeFmv, new Date(2026, 10, 13), 335000);
+  assert.equal(r.yearNote, '');
+  assert.deepEqual([r.repo.low, r.repo.high, r.repo.median, r.repo.n], [398000, 425000, 411500, 2]);
+  assert.ok(Math.abs(r.repo.pct - 335000 / 411500) < 1e-9);
+  assert.deepEqual([r.used.low, r.used.high, r.used.n], [470000, 470000, 1]);
+});
+
+test('marketRef: falls back to ±1 year, cleans brand/model, null when nothing matches', () => {
+  const L = [{ brand: 'Mitsubihsi', model: 'Mirage G4 GLX', year: 2021, type: 'repo', price: 365000, month: '2026-11' }];
+  const r = marketRef(L, { brand: 'MITSUBISHI', series: 'MIRAGE G4', year: 2022 }, fakeFmv, new Date(2026, 10, 13), 300000);
+  assert.equal(r.yearNote, '±1 year');
+  assert.equal(r.repo.n, 1);
+  assert.equal(r.used, null);
+  assert.equal(marketRef(L, { brand: 'TOYOTA', series: 'VIOS', year: 2021 }, fakeFmv, new Date(2026, 10, 13), 300000), null);
+  assert.equal(marketRef([], { brand: 'TOYOTA', series: 'VIOS', year: 2021 }, fakeFmv, new Date(2026, 10, 13), 300000), null);
+});
