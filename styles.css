@@ -163,8 +163,6 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .kpi.placeholder { border-top-color: var(--line); border-style: dashed; justify-content: center; }
 .kpi.placeholder .val { color: var(--muted); }
 
-/* Key columns on the Losses tables (units, sold amount, total loss, % of net loss): bold headers, no background */
-table.hlt th:nth-child(n+2):nth-child(-n+5) { color: var(--fg); font-weight: 600; }
 
 /* Sold per day calendar (workdays only) */
 .cal { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
