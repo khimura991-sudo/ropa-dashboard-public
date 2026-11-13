@@ -312,7 +312,8 @@
 
   // Sold per day: workdays of the picked month from the sales file (fmv-data.xlsx)
   function drawCalendar(i) {
-    const box = $('cal'), note = $('cal-note');
+    const box = $('cal'), note = $('cal-note'), sum = $('cal-sum');
+    sum.replaceChildren();
     if (SALES_ERR) { box.replaceChildren(); note.textContent = 'The sales file could not be read: ' + SALES_ERR; return; }
     if (!SALES) { box.replaceChildren(); note.textContent = 'Loading the sales file…'; return; }
     const year = dataYear(), days = SALES.days || [];
@@ -322,7 +323,8 @@
     const lastDay = days.reduce((a, b) => (b > a ? b : a), ''), now = new Date(), lastD = new Date(lastDay + 'T00:00:00');
     const upTo = lastD < now ? lastD : now, cal = DASH.workdayCalendar(inMonth, year, i, upTo), todayIso = DASH.dayOf(upTo);
     note.textContent = `From the sales file (fmv-data.xlsx), data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}. ` +
-      (cal.weekendUnits ? `${int(cal.weekendUnits)} weekend unit${cal.weekendUnits === 1 ? ' is' : 's are'} added to the Friday before. ` : '') + 'Gold days are at or above the daily average.';
+      (cal.weekendUnits ? `${int(cal.weekendUnits)} weekend unit${cal.weekendUnits === 1 ? ' is' : 's are'} added to the Friday before. ` : '') +
+      'Gold days are at or above the daily average. The count can differ slightly from Total units sold, which comes from the Google Sheet.';
     const kids = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((w) => el('div', 'wd', w));
     cal.weeks.forEach((w) => w.forEach((x) => {
       if (!x) { kids.push(el('div', 'day blank')); return; }
@@ -334,11 +336,9 @@
       cell.append(el('span', 'd', String(x.d)), el('span', 'n', fut ? '' : int(x.units)), el('span', 'w', x.weekend ? `+${x.weekend} wknd` : ''));
       kids.push(cell);
     }));
-    const sum = el('div', 'cal-sum');
     [[int(cal.total), 'units sold'], [cal.average.toFixed(1), 'average per workday'], [int(cal.workdaysSoFar), 'workdays' + (cal.workdaysSoFar < cal.weeks.flat().filter(Boolean).length ? ' so far' : '')]]
       .forEach(([v, l]) => { const s = el('span'); s.append(el('b', '', v), l); sum.appendChild(s); });
     box.replaceChildren(...kids);
-    box.after(sum); const old = box.parentNode.querySelectorAll('.cal-sum'); old.forEach((x, k) => { if (k < old.length - 1) x.remove(); });
   }
 
   // Top 10 brand / model by units sold in the picked month, from the sales file
@@ -348,7 +348,9 @@
     if (SALES_ERR) { tb.replaceChildren(); note.textContent = 'The sales file could not be read: ' + SALES_ERR; return; }
     if (!SALES) { tb.replaceChildren(); note.textContent = 'Loading the sales file…'; return; }
     const rows = DASH.topBrandModels(SALES.units, dataYear(), i, window.FMV);
-    note.textContent = rows.length ? 'Ranked by units sold, from the sales file (fmv-data.xlsx). Loss per brand isn\'t in the data yet.' : 'No daily data for this month in the sales file.';
+    const lastDay = (SALES.days || []).reduce((a, b) => (b > a ? b : a), '');
+    const through = lastDay ? ` Data through ${new Date(lastDay + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}.` : '';
+    note.textContent = (rows.length ? 'Ranked by units sold, from the sales file (fmv-data.xlsx). Loss per brand isn\'t in the data yet.' : 'No daily data for this month in the sales file.') + through;
     fill('brands', rows.map((r, k) => ({ ...r, k: k + 1 })), [[(r) => String(r.k)], [(r) => titleCase(r.name)], [(r) => int(r.units)], [(r) => pesoFull(r.amount)]]);
   }
 

@@ -75,14 +75,14 @@
       return { units, days: units.allDays, asOf: r.headers.get('last-modified') };
     }
     const useSheet = C.sheetCsvUrl && !/PASTE-/.test(C.sheetCsvUrl);
-    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!useSheet) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     const g = await fetch(C.sheetCsvUrl + (C.sheetCsvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
-    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!g.ok) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     const rows = parseCsv(await g.text());
     const head = rows[0].map((h) => h.trim().toLowerCase());
     const pi = head.indexOf('part'), di = head.indexOf('data');
     const parts = rows.slice(1).filter((x) => Number(x[pi]) >= 3 && x[di]).sort((a, b) => Number(a[pi]) - Number(b[pi])).map((x) => x[di]);
-    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to fmv.html.');
+    if (!parts.length) throw new Error('No sales history found: upload fmv-data.xlsx next to index.html.');
     let acc = '';
     for (const p of parts) { acc += p; try { const f = JSON.parse(acc); return { units: FMV.unpack(f), asOf: f.generated_at }; } catch (e) { /* keep joining */ } }
     throw new Error('The sales history in the Google Sheet is incomplete. Reload in a minute.');
